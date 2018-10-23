@@ -1,0 +1,3 @@
+[submodule "pydcm2niix"]
+	path = pydcm2niix
+	url = https://github.com/jstutters/pydcm2niix.git
