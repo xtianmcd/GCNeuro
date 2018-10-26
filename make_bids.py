@@ -2,7 +2,6 @@ import os
 import sys
 import json
 import subprocess
-# import pydcm2niix.pydcm2niix.conversion as niix
 
 main_dir = "./" + sys.argv[1] + "/"
 subj_dirs = os.listdir(main_dir)
