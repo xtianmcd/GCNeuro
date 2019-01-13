@@ -1,0 +1,2 @@
+AvgTranslation AvgRotation PercentBadSlices AvgDropoutScore
+0.566605 0.0028432 0 1

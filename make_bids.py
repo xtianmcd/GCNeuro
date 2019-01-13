@@ -56,7 +56,6 @@ for subj in subj_dirs:
             run+=1
             newfn = sub_name+'_run-0{}_dwi'.format(run)
             newdir = os.path.join(main_dir,sub_name,'dwi/')
-            # niix.dicom_to_nifti(rawdiff, newfn)
             cmd = "dcm2niix -b y -o {} -f {} {}".format(newdir,newfn,rawdiff)
             process = subprocess.Popen(cmd.split(), stdout=subprocess.PIPE)
             output, error = process.communicate()

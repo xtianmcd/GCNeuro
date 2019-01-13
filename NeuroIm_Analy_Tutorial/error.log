@@ -1,0 +1,6 @@
+mri_read(): couldn't determine type of file /Users/xtian/Documents/CSCI8850/Final Project/&
+mri_read(): couldn't determine type of file /Users/xtian/Documents/CSCI8850/Final Project/&
+mri_read(): couldn't determine type of file /Users/xtian/Documents/CSCI8850/Final Project/&
+niiRead(): error opening file /Users/xtian/Documents/CSCI8850/Final Project/$FSLDIR/data/standard/MNI152_T1_1mm_brain.nii.gz
+niiRead(): error opening file /Users/xtian/Documents/CSCI8850/Final Project/$FSLDIR/data/standard/MNI152_T1_1mm_brain.nii.gz
+mri_read(): couldn't determine type of file /Users/xtian/Documents/CSCI8850/Final Project/&
