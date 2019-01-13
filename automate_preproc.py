@@ -29,12 +29,12 @@ def pick_dwi_runs(subject):
                                             # runs need different stats
     if not runs_for_topup:
         print("Topup stats are all the same for {}".format(subject))
-        topup_corr = False
-        return stats_for_topup, [], topup_corr
+        topup_qual = False
+        return stats_for_topup, [], topup_qual
     print("\tRuns found for {}: {}".format(subject,list(topup_stats.keys())))
     print()
-    topup_corr = True
-    return stats_for_topup,runs_for_topup, topup_corr
+    topup_qual = True
+    return stats_for_topup,runs_for_topup, topup_qual
 
 def merge_b0s(subject,runs,topup_req):
     print("\tMerging b0's")
@@ -55,13 +55,25 @@ def create_acq(hdr_stats, subj):
     for k,v in hdr_stats.items():
         """ create acquisition file for topup """
         if len(v['ped'])==1:
-            if v['ped']=='i': acq_str+='1 0 0'
-            elif v['ped']=='j': acq_str+='0 1 0'
-            elif v['ped']=='k': acq_str+='0 0 1'
+            if v['ped']=='i':
+                acq_str+='1 0 0'
+                v['bdp']='x'
+            elif v['ped']=='j':
+                acq_str+='0 1 0'
+                v['bdp']='y'
+            elif v['ped']=='k':
+                acq_str+='0 0 1'
+                v['bdp']='z'
         else:
-             if v['ped']=='i-': acq_str+='-1 0 0'
-             elif v['ped']=='j-': acq_str+='0 -1 0'
-             elif v['ped']=='k-': acq_str+='0 0 -1'
+             if v['ped']=='i-':
+                 acq_str+='-1 0 0'
+                 v['bdp']='x-'
+             elif v['ped']=='j-':
+                 acq_str+='0 -1 0'
+                 v['bdp']='y-'
+             elif v['ped']=='k-':
+                 acq_str+='0 0 -1'
+                 v['bdp']='z-'
         if not acq_str: print("error reading PhaseEncodingDirection of {}"\
                                     .format(k))
         acq_str+=' '+str(v['readout'])+'\n'
@@ -113,7 +125,7 @@ def run_topup(hdr_info, main_dir, subject):
     print()
     return
 
-def skull_strip(subject, nii_name):
+def skull_strip_dwi(subject, nii_name):
     print("\tSkull strip...")
     bash_cmd('fslmaths {}/dwi/{} -Tmean {}/dwi/{}'\
     .format(subject,nii_name, subject,nii_name))
@@ -122,9 +134,12 @@ def skull_strip(subject, nii_name):
     print()
     return
 
-def run_eddy(hdr_info, subject):
+def run_eddy(hdr_info, subject, topup_ran):
     print("\tRun eddy for each run")
     ind=0
+    if topup_ran: topup_flag = '--topup={}/dwi/{}_topup'\
+    .format(subject,subject.split('/')[-1])
+    else: topup_flag = ''
     for run in list(hdr_info.keys()):
         """ run eddy on each run """
         print("\t\tRun {}".format(run))
@@ -138,11 +153,37 @@ def run_eddy(hdr_info, subject):
             index_txt.write(indx)
             index_txt.write(' ')
         bash_cmd(\
-            'eddy --imain={}/dwi/{}.nii --mask={}/dwi/{}_topup_b0_brain_mask --acqp={}/dwi/acq.txt --index={}/dwi/index{}.txt --bvecs={}/dwi/{}.bvec --bvals={}/dwi/{}.bval --topup={}/dwi/{}_topup --out={}/dwi/{}_eddy_corr'\
-                .format(subject,run, subject,subject.split('/')[-1], subject,\
-                 subject, ind, subject,run, subject,run,\
-                  subject,subject.split('/')[-1], subject,run))
+            'eddy --imain={}/dwi/{}.nii --mask={}/dwi/{}_brain_mask --acqp={}/dwi/acq.txt --index={}/dwi/index{}.txt --bvecs={}/dwi/{}.bvec --bvals={}/dwi/{}.bval {} --out={}/dwi/{}_eddy_corr'\
+                .format(subject,run, subject,subject.split('/')[-1],\
+                 subject, subject, ind, subject,run, subject,run,\
+                 topup_flag, subject,run))
     print()
+    return
+
+def run_brainsuite(subject, hdr_info, bs_home, topup_ran):
+    print("\tRunning BrainSuite...")
+    if topup_ran: dwi_mask = '{}/dwi/{}_topup_b0_brain_mask'\
+        .format(subject,subject.split('/')[-1])
+    bash_cmd('mkdir {}/anat/brainsuite')
+    for run in list(hdr_info.keys()):
+        print("\tPerforming dwi-mri co-registration for run {}"\
+            .format(run))
+        print("\t\t\t... skull strip re: anatomical image")
+        bash_cmd('bet {}/anat/{}_T1w.nii {}/anat/{}_T1w_bdp_brain -m'\
+            .format(subject,'_'.join(run.split('_')[:2],\
+                    subject,'_'.join(run.split('_')[:2]))
+        print("\t\t\t... Bias Field Correction on anatomical image")
+        bash_cmd('{}/bin/bfc -i {}/anat/{}_T1w_brain.nii -o {}/anat/{}_T1w_brain.bfc'\
+            .format(bs_home, subject, '_'.join(run.split('_')[:2],\
+                             subject, '_'.join(run.split('_')[:2])))
+        print("\t\t\t... running brainsuite diffusion pipeline (BDP)")
+        if not topup_ran: dwi_mask = '{}/dwi/{}_brain_mask'.format(subject,run)
+        bash_cmd('{}/bdp/bdp.sh {}/anat/{}_T1w_brain.bfc.nii.gz --output-diffusion-coordinate -output-subdir brainsuite/{} --dir={} --t1-mask {}/anat/{}_T1w_bdp_brain_mask --dwi-mask {}/dwi/{} --nii {}/dwi/{}_eddy_corr.nii.gz -g {}/dwi/{}_eddy_corr.eddy_rotated_bvecs -b {}/dwi/{}.bval -echo-spacing={}'\
+            .format(bs_home,subject,'_'.join(run.split('_')[:2], \
+                       run, hdr_info[run]['bdp'], \
+                       subject,'_'.join(run.split('_')[:2], subject,run, \
+                       subject,run, subject,run, subject,run,\
+                       hdr_info[run]['readout']))
     return
 
 def run_freesurfer(main_dir, subject, sub_dir):
@@ -164,6 +205,7 @@ def run_freesurfer(main_dir, subject, sub_dir):
 if __name__ == "__main__":
 
     maindir = '/Volumes/ElementsExternal/test1/'
+    brainsuite_home = '/Applications/BrainSuite18a'
 
     for subdir in os.listdir(maindir):
         if subdir.split('-')[0]=='sub':
@@ -187,6 +229,8 @@ if __name__ == "__main__":
             # skull_strip(sub, list(topup_stats.keys()), use_topup)
 
             run_eddy(topup_stats, sub)
+
+            run_brainsuite(sub, topup_stats, brainsuite_home, use_topup)
 
             run_freesurfer(maindir,sub,subdir)
 
