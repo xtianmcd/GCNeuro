@@ -5,10 +5,11 @@ import subprocess
 def bash_cmd(cmd):
     process = subprocess.Popen(cmd.split(), stdout=subprocess.PIPE)
     output, error = process.communicate()
+    return
 
 def pick_dwi_runs(subject):
-    print("Connectivity (DWI)")
-    print("+===========+")
+    print(" Connectivity (DWI)")
+    print("+==================+")
     jsons = list([os.path.join(root,i) for root,d,f in os.walk(subject)\
                                         for i in f \
                                         if root.split('/')[-1]=='dwi' \
@@ -28,10 +29,12 @@ def pick_dwi_runs(subject):
                                         or v['ped']!=v1['ped'])])
                                             # runs need different stats
     if not runs_for_topup:
-        print("Topup stats are all the same for {}".format(subject))
+        print("Topup stats are all the same for {}\n... Topup will not be used; distortions will be corrected during co-registration via BrainSuite"\
+        .format(subject))
         topup_qual = False
         return stats_for_topup, [], topup_qual
-    print("\tRuns found for {}: {}".format(subject,list(topup_stats.keys())))
+    else: print("Imaging parameters allow for Topup to be used prior to eddy")
+    print("\tRuns found for {}: {}".format(subject,list(stats_for_topup.keys())))
     print()
     topup_qual = True
     return stats_for_topup,runs_for_topup, topup_qual
@@ -45,12 +48,12 @@ def merge_b0s(subject,runs,topup_req):
         .join(run.split('_')[:2]))) # create the b0's
         merged += subject+'/dwi/'+'_'.join(run.split('_')[:2])+'_b0 '
     bash_cmd("fslmerge -t {}/dwi/b0merge {}".format(subject,merged)) #merge b0's
-    print("created {}/dwi/b0merge from {}".format(subject,merged))
+    print("\t\tcreated {}/dwi/b0merge from {}".format(subject,merged))
     print()
     return
 
 def create_acq(hdr_stats, subj):
-    print("\t\tCreating acquisition file")
+    print("\t\t...Creating acquisition file")
     acq_str = ''
     for k,v in hdr_stats.items():
         """ create acquisition file for topup """
@@ -81,10 +84,11 @@ def create_acq(hdr_stats, subj):
     # bash_cmd('printf "{}" > {}/dwi/acq.txt'.format(acq_str, subj)) #create acquisit. file
     with open(subj+'/dwi/acq.txt', 'w') as acq_txt:
         acq_txt.write(acq_str)
-    return
+    print(hdr_stats)
+    return hdr_stats
 
 def create_cnf(subj):
-    print("\t\tCreating config file")
+    print("\t\t...Creating config file")
     with open(subj+'/dwi/b02b0.cnf', 'w') as cnf:
         cnf.write('# Resolution (knot-spacing) of warps in mm\n')
         cnf.write('--warpres=20,16,14,12,10,6,4,4,4\n')
@@ -115,21 +119,22 @@ def create_cnf(subj):
     return
 
 def run_topup(hdr_info, main_dir, subject):
-    print("\tRunning topup...")
-    create_acq(hdr_info, subject)
+    print("\tPrepping for topup...")
+    updated_stats = create_acq(hdr_info, subject)
     create_cnf(subject)
+    print("\tRunning topup...")
     bash_cmd(\
         'topup --imain={}/dwi/b0merge --datain={}/dwi/acq.txt --config={}/dwi/b02b0.cnf --out={}/dwi/{}_topup --iout={}/dwi/{}_topup_b0'\
             .format(subject,subject,subject,subject,subject.split('/')[-1],\
             subject,subject.split('/')[-1]))
     print()
-    return
+    return updated_stats
 
 def skull_strip_dwi(subject, nii_name):
     print("\tSkull strip...")
-    bash_cmd('fslmaths {}/dwi/{} -Tmean {}/dwi/{}'\
+    bash_cmd('fslmaths {}/dwi/{} -Tmean {}/dwi/{}_mean'\
     .format(subject,nii_name, subject,nii_name))
-    bash_cmd('bet {}/dwi/{} {}/dwi/{}_brain -m'\
+    bash_cmd('bet {}/dwi/{}_mean {}/dwi/{}_brain -m'\
     .format(subject,nii_name, subject,nii_name)) #run BET for skull stripping
     print()
     return
@@ -137,12 +142,16 @@ def skull_strip_dwi(subject, nii_name):
 def run_eddy(hdr_info, subject, topup_ran):
     print("\tRun eddy for each run")
     ind=0
-    if topup_ran: topup_flag = '--topup={}/dwi/{}_topup'\
-    .format(subject,subject.split('/')[-1])
+    if topup_ran:
+        topup_flag = '--topup={}/dwi/{}_topup'\
+                        .format(subject,subject.split('/')[-1])
+        mask_prefix = subject.split('/')[-1]
     else: topup_flag = ''
     for run in list(hdr_info.keys()):
         """ run eddy on each run """
         print("\t\tRun {}".format(run))
+        if not topup_ran:
+            mask_prefix = run
         ind +=1
         # bash_cmd('indx = ""')
         indx = ''
@@ -154,7 +163,7 @@ def run_eddy(hdr_info, subject, topup_ran):
             index_txt.write(' ')
         bash_cmd(\
             'eddy --imain={}/dwi/{}.nii --mask={}/dwi/{}_brain_mask --acqp={}/dwi/acq.txt --index={}/dwi/index{}.txt --bvecs={}/dwi/{}.bvec --bvals={}/dwi/{}.bval {} --out={}/dwi/{}_eddy_corr'\
-                .format(subject,run, subject,subject.split('/')[-1],\
+                .format(subject,run, subject,mask_prefix,\
                  subject, subject, ind, subject,run, subject,run,\
                  topup_flag, subject,run))
     print()
@@ -164,31 +173,30 @@ def run_brainsuite(subject, hdr_info, bs_home, topup_ran):
     print("\tRunning BrainSuite...")
     if topup_ran: dwi_mask = '{}/dwi/{}_topup_b0_brain_mask'\
         .format(subject,subject.split('/')[-1])
-    bash_cmd('mkdir {}/anat/brainsuite')
+    bash_cmd('mkdir {}/anat/brainsuite'.format(subject))
     for run in list(hdr_info.keys()):
         print("\tPerforming dwi-mri co-registration for run {}"\
             .format(run))
         print("\t\t\t... skull strip re: anatomical image")
-        bash_cmd('bet {}/anat/{}_T1w.nii {}/anat/{}_T1w_bdp_brain -m'\
-            .format(subject,'_'.join(run.split('_')[:2],\
-                    subject,'_'.join(run.split('_')[:2]))
+        bash_cmd('bet {}/anat/{}_T1w {}/anat/brainsuite/{}_T1w_bdp_brain -m'\
+            .format(subject,'_'.join(run.split('_')[:2]),\
+                    subject,'_'.join(run.split('_')[:2])))
         print("\t\t\t... Bias Field Correction on anatomical image")
-        bash_cmd('{}/bin/bfc -i {}/anat/{}_T1w_brain.nii -o {}/anat/{}_T1w_brain.bfc'\
-            .format(bs_home, subject, '_'.join(run.split('_')[:2],\
+        bash_cmd('{}/bin/bfc -i {}/anat/brainsuite/{}_T1w_bdp_brain -o {}/anat/brainsuite/{}_T1w_brain.bfc'\
+            .format(bs_home, subject, '_'.join(run.split('_')[:2]),\
                              subject, '_'.join(run.split('_')[:2])))
         print("\t\t\t... running brainsuite diffusion pipeline (BDP)")
         if not topup_ran: dwi_mask = '{}/dwi/{}_brain_mask'.format(subject,run)
-        bash_cmd('{}/bdp/bdp.sh {}/anat/{}_T1w_brain.bfc.nii.gz --output-diffusion-coordinate -output-subdir brainsuite/{} --dir={} --t1-mask {}/anat/{}_T1w_bdp_brain_mask --dwi-mask {}/dwi/{} --nii {}/dwi/{}_eddy_corr.nii.gz -g {}/dwi/{}_eddy_corr.eddy_rotated_bvecs -b {}/dwi/{}.bval -echo-spacing={}'\
-            .format(bs_home,subject,'_'.join(run.split('_')[:2], \
-                       run, hdr_info[run]['bdp'], \
-                       subject,'_'.join(run.split('_')[:2], subject,run, \
-                       subject,run, subject,run, subject,run,\
-                       hdr_info[run]['readout']))
+        bash_cmd('{}/bdp/bdp.sh {}/anat/brainsuite/{}_T1w_brain.bfc.nii.gz --output-diffusion-coordinate --output-subdir {} --dir=\"{}\" --t1-mask {}/anat/brainsuite/{}_T1w_bdp_brain_mask.nii.gz --dwi-mask {}/dwi/{}_brain_mask.nii.gz --nii {}/dwi/{}_eddy_corr.nii.gz -g {}/dwi/{}_eddy_corr.eddy_rotated_bvecs -b {}/dwi/{}.bval'\
+            .format(bs_home, subject,'_'.join(run.split('_')[:2]), \
+                       '_'.join(run.split('_')[:2]), hdr_info[run]['bdp'], \
+                       subject,'_'.join(run.split('_')[:2]), subject,run, \
+                       subject,run, subject,run, subject,run))
     return
 
 def run_freesurfer(main_dir, subject, sub_dir):
-    print("Anatomy (MRI)")
-    print("+===========+")
+    print(" Anatomy (MRI)")
+    print("+=============+")
     print("\tPerforming Freesurfer for each run")
     anatdir = subject+'/anat'
     bash_cmd('mkdir {}'.format(anatdir+'/freesurfer'))
@@ -204,7 +212,7 @@ def run_freesurfer(main_dir, subject, sub_dir):
 
 if __name__ == "__main__":
 
-    maindir = '/Volumes/ElementsExternal/test1/'
+    maindir = '/Volumes/ElementsExternal/test2/'
     brainsuite_home = '/Applications/BrainSuite18a'
 
     for subdir in os.listdir(maindir):
@@ -216,21 +224,29 @@ if __name__ == "__main__":
             sub = maindir+subdir
 
             topup_stats,topup_runs,use_topup = pick_dwi_runs(sub)
+            # stats_topup = create_acq(topup_stats, sub)
+            # for run in list(stats_topup.keys()):
+            #     print('{}/bdp/bdp.sh {}/anat/brainsuite/brainsuite/{}_T1w_brain.bfc.nii.gz --output-diffusion-coordinate --output-subdir {} --dir={} --t1-mask {}/anat/brainsuite/{}_T1w_bdp_brain_mask.nii.gz --dwi-mask {}/dwi/{}_brain_mask.nii.gz --nii {}/dwi/{}_eddy_corr.nii.gz -g {}/dwi/{}_eddy_corr.eddy_rotated_bvecs -b {}/dwi/{}.bval'\
+            #         .format(brainsuite_home, sub,'_'.join(run.split('_')[:2]), \
+            #                '_'.join(run.split('_')[:2]), stats_topup[run]['bdp'], \
+            #                sub,'_'.join(run.split('_')[:2]), sub,run, \
+            #                sub,run, sub,run, sub,run))
 
             if use_topup:
                 merge_b0s(sub,topup_runs,use_topup)
-                run_topup(topup_stats, maindir, sub)
-                skull_strip(sub, subject.split('/')[-1]+'_topup_b0')
+                stats_topup = run_topup(topup_stats, maindir, sub)
+                skull_strip_dwi(sub, sub.split('/')[-1]+'_topup_b0')
             else:
                 merge_b0s(sub,list(topup_stats.keys()),use_topup)
-                for run in list(topup_stats.keys()):
-                    skull_strip(sub, run)
+                stats_topup = create_acq(topup_stats, sub)
+                for run in list(stats_topup.keys()):
+                    skull_strip_dwi(sub, run)
 
             # skull_strip(sub, list(topup_stats.keys()), use_topup)
 
-            run_eddy(topup_stats, sub)
+            run_eddy(stats_topup, sub, use_topup)
 
-            run_brainsuite(sub, topup_stats, brainsuite_home, use_topup)
+            run_brainsuite(sub, stats_topup, brainsuite_home, use_topup)
 
             run_freesurfer(maindir,sub,subdir)
 
