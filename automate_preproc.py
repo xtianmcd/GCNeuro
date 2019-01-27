@@ -1,6 +1,9 @@
 import os
 import json
 import subprocess
+from joblib import Parallel, delayed
+import time
+
 
 def bash_cmd(cmd):
     process = subprocess.Popen(cmd.split(), stdout=subprocess.PIPE)
@@ -187,11 +190,14 @@ def run_brainsuite(subject, hdr_info, bs_home, topup_ran):
                              subject, '_'.join(run.split('_')[:2])))
         print("\t\t\t... running brainsuite diffusion pipeline (BDP)")
         if not topup_ran: dwi_mask = '{}/dwi/{}_brain_mask'.format(subject,run)
-        bash_cmd('{}/bdp/bdp.sh {}/anat/brainsuite/{}_T1w_brain.bfc.nii.gz --output-diffusion-coordinate --output-subdir {} --dir=\"{}\" --t1-mask {}/anat/brainsuite/{}_T1w_bdp_brain_mask.nii.gz --dwi-mask {}/dwi/{}_brain_mask.nii.gz --nii {}/dwi/{}_eddy_corr.nii.gz -g {}/dwi/{}_eddy_corr.eddy_rotated_bvecs -b {}/dwi/{}.bval'\
-            .format(bs_home, subject,'_'.join(run.split('_')[:2]), \
-                       '_'.join(run.split('_')[:2]), hdr_info[run]['bdp'], \
-                       subject,'_'.join(run.split('_')[:2]), subject,run, \
-                       subject,run, subject,run, subject,run))
+        with open('{}/dwi/{}_run_bdp.sh'.format(subject,run),'w') as bdp_sh:
+            bdp_sh.write('{}/bdp/bdp.sh {}/anat/brainsuite/{}_T1w_brain.bfc.nii.gz --output-diffusion-coordinate --output-subdir {} --dir=\"{}\" --t1-mask {}/anat/brainsuite/{}_T1w_bdp_brain_mask.nii.gz --dwi-mask {}/dwi/{}_brain_mask.nii.gz --nii {}/dwi/{}_eddy_corr.nii.gz -g {}/dwi/{}_eddy_corr.eddy_rotated_bvecs -b {}/dwi/{}.bval'\
+                .format(bs_home, subject,'_'.join(run.split('_')[:2]), \
+                           '_'.join(run.split('_')[:2]), hdr_info[run]['bdp'], \
+                           subject,'_'.join(run.split('_')[:2]), subject,run, \
+                           subject,run, subject,run, subject,run))
+
+        bash_cmd('sh {}/dwi/{}_run_bdp.sh'.format(subject,run))
     return
 
 def run_freesurfer(main_dir, subject, sub_dir):
@@ -210,44 +216,45 @@ def run_freesurfer(main_dir, subject, sub_dir):
     print("\n")
     return
 
+def preprocess_subject(subject):
+    if subject.split('-')[0]=='sub':
+
+        print(f'Preprocessing data for {subject}')
+
+        sub = maindir+subject
+
+        topup_stats,topup_runs,use_topup = pick_dwi_runs(sub)
+
+        if use_topup:
+            merge_b0s(sub,topup_runs,use_topup)
+            stats_topup = run_topup(topup_stats, maindir, sub)
+            skull_strip_dwi(sub, sub.split('/')[-1]+'_topup_b0')
+        else:
+            merge_b0s(sub,list(topup_stats.keys()),use_topup)
+            stats_topup = create_acq(topup_stats, sub)
+            for run in list(stats_topup.keys()):
+                skull_strip_dwi(sub, run)
+
+        # skull_strip(sub, list(topup_stats.keys()), use_topup)
+
+        run_eddy(stats_topup, sub, use_topup)
+
+        run_brainsuite(sub, stats_topup, brainsuite_home, use_topup)
+
+        run_freesurfer(maindir,sub,subject)
+
+        print(f"+===========+\nDone with {subject}\n+===========+")
+    return
+
 if __name__ == "__main__":
 
     maindir = '/Volumes/ElementsExternal/test2/'
     brainsuite_home = '/Applications/BrainSuite18a'
 
-    for subdir in os.listdir(maindir):
-        if subdir.split('-')[0]=='sub':
-            """ iterate through the subjects """
+    njobs=[1,-1]
 
-            print("Preprocessing data for {}".format(subdir))
-
-            sub = maindir+subdir
-
-            topup_stats,topup_runs,use_topup = pick_dwi_runs(sub)
-            # stats_topup = create_acq(topup_stats, sub)
-            # for run in list(stats_topup.keys()):
-            #     print('{}/bdp/bdp.sh {}/anat/brainsuite/brainsuite/{}_T1w_brain.bfc.nii.gz --output-diffusion-coordinate --output-subdir {} --dir={} --t1-mask {}/anat/brainsuite/{}_T1w_bdp_brain_mask.nii.gz --dwi-mask {}/dwi/{}_brain_mask.nii.gz --nii {}/dwi/{}_eddy_corr.nii.gz -g {}/dwi/{}_eddy_corr.eddy_rotated_bvecs -b {}/dwi/{}.bval'\
-            #         .format(brainsuite_home, sub,'_'.join(run.split('_')[:2]), \
-            #                '_'.join(run.split('_')[:2]), stats_topup[run]['bdp'], \
-            #                sub,'_'.join(run.split('_')[:2]), sub,run, \
-            #                sub,run, sub,run, sub,run))
-
-            if use_topup:
-                merge_b0s(sub,topup_runs,use_topup)
-                stats_topup = run_topup(topup_stats, maindir, sub)
-                skull_strip_dwi(sub, sub.split('/')[-1]+'_topup_b0')
-            else:
-                merge_b0s(sub,list(topup_stats.keys()),use_topup)
-                stats_topup = create_acq(topup_stats, sub)
-                for run in list(stats_topup.keys()):
-                    skull_strip_dwi(sub, run)
-
-            # skull_strip(sub, list(topup_stats.keys()), use_topup)
-
-            run_eddy(stats_topup, sub, use_topup)
-
-            run_brainsuite(sub, stats_topup, brainsuite_home, use_topup)
-
-            run_freesurfer(maindir,sub,subdir)
-
-            print("+===========+\nDone with {}\n+===========+".format(subdir))
+    for n, jobs in enumerate(njobs):
+        start=time.time()
+        Parallel(n_jobs=jobs,verbose=50)(delayed(preprocess_subject)(subdir) for subdir in os.listdir(maindir))
+        times[n]= time.time() - start
+    np.save("times.txt",times)
