@@ -10,6 +10,19 @@ def bash_cmd(cmd):
     output, error = process.communicate()
     return
 
+def fsl_fs_setup:
+    """ FSL Setup """
+    bash_cmd('FSLDIR=/usr/local/fsl')
+    bash_cmd('PATH=${FSLDIR}/bin:${PATH}')
+    bash_cmd('export FSLDIR PATH')
+    bash_cmd('. ${FSLDIR}/etc/fslconf/fsl.sh')
+
+    """ Freesurfer Setup """
+    bash_cmd('export FREESURFER_HOME=/Applications/freesurfer')
+    bash_cmd('source $FREESURFER_HOME/SetUpFreeSurfer.sh')
+    return
+
+
 def pick_dwi_runs(subject):
     print(" Connectivity (DWI)")
     print("+==================+")
@@ -191,10 +204,10 @@ def run_brainsuite(subject, hdr_info, bs_home, topup_ran):
         print("\t\t\t... running brainsuite diffusion pipeline (BDP)")
         if not topup_ran: dwi_mask = '{}/dwi/{}_brain_mask'.format(subject,run)
         with open('{}/dwi/{}_run_bdp.sh'.format(subject,run),'w') as bdp_sh:
-            bdp_sh.write('{}/bdp/bdp.sh {}/anat/brainsuite/{}_T1w_brain.bfc.nii.gz --output-diffusion-coordinate --output-subdir {} --dir=\"{}\" --t1-mask {}/anat/brainsuite/{}_T1w_bdp_brain_mask.nii.gz --dwi-mask {}/dwi/{}_brain_mask.nii.gz --nii {}/dwi/{}_eddy_corr.nii.gz -g {}/dwi/{}_eddy_corr.eddy_rotated_bvecs -b {}/dwi/{}.bval'\
+            bdp_sh.write('{}/bdp/bdp.sh {}/anat/brainsuite/{}_T1w_brain.bfc.nii.gz --output-diffusion-coordinate --output-subdir {} --dir=\"{}\" --t1-mask {}/anat/brainsuite/{}_T1w_bdp_brain_mask.nii.gz --dwi-mask {}.nii.gz --nii {}/dwi/{}_eddy_corr.nii.gz -g {}/dwi/{}_eddy_corr.eddy_rotated_bvecs -b {}/dwi/{}.bval'\
                 .format(bs_home, subject,'_'.join(run.split('_')[:2]), \
                            '_'.join(run.split('_')[:2]), hdr_info[run]['bdp'], \
-                           subject,'_'.join(run.split('_')[:2]), subject,run, \
+                           subject,'_'.join(run.split('_')[:2]), dwi_mask \
                            subject,run, subject,run, subject,run))
 
         bash_cmd('sh {}/dwi/{}_run_bdp.sh'.format(subject,run))
@@ -216,7 +229,9 @@ def run_freesurfer(main_dir, subject, sub_dir):
     print("\n")
     return
 
-def preprocess_subject(subject):
+def preprocess_subject(subject, maindir, brainsuitedir, init_setup=False):
+    if init_setup: fsl_fs_setup()
+
     if subject.split('-')[0]=='sub':
 
         print(f'Preprocessing data for {subject}')
@@ -239,7 +254,7 @@ def preprocess_subject(subject):
 
         run_eddy(stats_topup, sub, use_topup)
 
-        run_brainsuite(sub, stats_topup, brainsuite_home, use_topup)
+        run_brainsuite(sub, stats_topup, brainsuitedir, use_topup)
 
         run_freesurfer(maindir,sub,subject)
 
@@ -248,13 +263,13 @@ def preprocess_subject(subject):
 
 if __name__ == "__main__":
 
-    maindir = '/Volumes/ElementsExternal/test2/'
+    main_dir = '/Volumes/ElementsExternal/test2/'
     brainsuite_home = '/Applications/BrainSuite18a'
 
     njobs=[1,-1]
 
     for n, jobs in enumerate(njobs):
         start=time.time()
-        Parallel(n_jobs=jobs,verbose=50)(delayed(preprocess_subject)(subdir) for subdir in os.listdir(maindir))
+        Parallel(n_jobs=jobs,verbose=50)(delayed(preprocess_subject)(subdir, main_dir, brainsuite_home) for subdir in os.listdir(maindir))
         times[n]= time.time() - start
     np.save("times.txt",times)
