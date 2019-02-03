@@ -10,7 +10,7 @@ def bash_cmd(cmd):
     output, error = process.communicate()
     return
 
-def fsl_fs_setup:
+def fsl_fs_setup():
     """ FSL Setup """
     bash_cmd('FSLDIR=/usr/local/fsl')
     bash_cmd('PATH=${FSLDIR}/bin:${PATH}')
@@ -178,7 +178,7 @@ def run_eddy(hdr_info, subject, topup_ran):
             index_txt.write(indx)
             index_txt.write(' ')
         bash_cmd(\
-            'eddy --imain={}/dwi/{}.nii --mask={}/dwi/{}_brain_mask --acqp={}/dwi/acq.txt --index={}/dwi/index{}.txt --bvecs={}/dwi/{}.bvec --bvals={}/dwi/{}.bval {} --out={}/dwi/{}_eddy_corr'\
+            'eddy_openmp --imain={}/dwi/{}.nii --mask={}/dwi/{}_brain_mask --acqp={}/dwi/acq.txt --index={}/dwi/index{}.txt --bvecs={}/dwi/{}.bvec --bvals={}/dwi/{}.bval {} --out={}/dwi/{}_eddy_corr'\
                 .format(subject,run, subject,mask_prefix,\
                  subject, subject, ind, subject,run, subject,run,\
                  topup_flag, subject,run))
@@ -207,8 +207,7 @@ def run_brainsuite(subject, hdr_info, bs_home, topup_ran):
             bdp_sh.write('{}/bdp/bdp.sh {}/anat/brainsuite/{}_T1w_brain.bfc.nii.gz --output-diffusion-coordinate --output-subdir {} --dir=\"{}\" --t1-mask {}/anat/brainsuite/{}_T1w_bdp_brain_mask.nii.gz --dwi-mask {}.nii.gz --nii {}/dwi/{}_eddy_corr.nii.gz -g {}/dwi/{}_eddy_corr.eddy_rotated_bvecs -b {}/dwi/{}.bval'\
                 .format(bs_home, subject,'_'.join(run.split('_')[:2]), \
                            '_'.join(run.split('_')[:2]), hdr_info[run]['bdp'], \
-                           subject,'_'.join(run.split('_')[:2]), dwi_mask \
-                           subject,run, subject,run, subject,run))
+                           subject,'_'.join(run.split('_')[:2]), dwi_mask, subject,run, subject,run, subject,run))
 
         bash_cmd('sh {}/dwi/{}_run_bdp.sh'.format(subject,run))
     return
@@ -263,13 +262,15 @@ def preprocess_subject(subject, maindir, brainsuitedir, init_setup=False):
 
 if __name__ == "__main__":
 
-    main_dir = '/Volumes/ElementsExternal/test2/'
-    brainsuite_home = '/Applications/BrainSuite18a'
+    main_dir = ['/data/brain/test2/','/data/brain/test4/']
+    brainsuite_home = '/data/brain/BrainSuite18a'
 
     njobs=[1,-1]
+    times=[]
 
     for n, jobs in enumerate(njobs):
+        times.append([])
         start=time.time()
-        Parallel(n_jobs=jobs,verbose=50)(delayed(preprocess_subject)(subdir, main_dir, brainsuite_home) for subdir in os.listdir(maindir))
-        times[n]= time.time() - start
+        Parallel(n_jobs=jobs,verbose=50)(delayed(preprocess_subject)(subdir, main_dir[n], brainsuite_home) for subdir in os.listdir(main_dir[n]))
+        times[n].append(time.time() - start)
     np.save("times.txt",times)
