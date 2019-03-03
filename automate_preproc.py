@@ -3,11 +3,14 @@ import json
 import subprocess
 from joblib import Parallel, delayed
 import time
-
+import numpy as np
+import datetime
 
 def bash_cmd(cmd):
-    process = subprocess.Popen(cmd.split(), stdout=subprocess.PIPE)
+    process = subprocess.Popen(cmd.split(), stdout=subprocess.PIPE)#, stderr=subprocess.STDOUT)
     output, error = process.communicate()
+    with open('preproc_log.txt','a') as lt:
+        lt.write(f'Command: {cmd}\nOutput: {[output,error]}\n')
     return
 
 def fsl_fs_setup():
@@ -161,7 +164,7 @@ def run_eddy(hdr_info, subject, topup_ran):
     if topup_ran:
         topup_flag = '--topup={}/dwi/{}_topup'\
                         .format(subject,subject.split('/')[-1])
-        mask_prefix = subject.split('/')[-1]
+        mask_prefix = subject.split('/')[-1]+'_topup_b0'
     else: topup_flag = ''
     for run in list(hdr_info.keys()):
         """ run eddy on each run """
@@ -194,8 +197,9 @@ def run_brainsuite(subject, hdr_info, bs_home, topup_ran):
         print("\tPerforming dwi-mri co-registration for run {}"\
             .format(run))
         print("\t\t\t... skull strip re: anatomical image")
-        bash_cmd('bet {}/anat/{}_T1w {}/anat/brainsuite/{}_T1w_bdp_brain -m'\
-            .format(subject,'_'.join(run.split('_')[:2]),\
+        bash_cmd('{}/bin/bse -i {}/anat/{}_T1w -o {}/anat/brainsuite/{}_T1w_bdp_brain --mask {}/anat/brainsuite/{}_T1w_bdp_brain_mask'\
+            .format(bs_home, subject,'_'.join(run.split('_')[:2]),\
+                    subject,'_'.join(run.split('_')[:2]),\
                     subject,'_'.join(run.split('_')[:2])))
         print("\t\t\t... Bias Field Correction on anatomical image")
         bash_cmd('{}/bin/bfc -i {}/anat/brainsuite/{}_T1w_bdp_brain -o {}/anat/brainsuite/{}_T1w_brain.bfc'\
@@ -229,6 +233,7 @@ def run_freesurfer(main_dir, subject, sub_dir):
     return
 
 def preprocess_subject(subject, maindir, brainsuitedir, init_setup=False):
+    start=time.time()
     if init_setup: fsl_fs_setup()
 
     if subject.split('-')[0]=='sub':
@@ -258,19 +263,31 @@ def preprocess_subject(subject, maindir, brainsuitedir, init_setup=False):
         run_freesurfer(maindir,sub,subject)
 
         print(f"+===========+\nDone with {subject}\n+===========+")
+
+        dur = time.time() - start
+
+        with open('times.txt','a') as tt:
+            tt.write(f'sub: {subject},\ttime: {dur}\n')
+
     return
 
 if __name__ == "__main__":
 
-    main_dir = ['/data/brain/test2/','/data/brain/test4/']
+    main_dir = '/data/brain/mridti_small/'
     brainsuite_home = '/data/brain/BrainSuite18a'
+    n_jobs=1
 
-    njobs=[1,-1]
-    times=[]
+    with open('times.txt','a') as tt:
+        tt.write(f'\n<=============| Preprocessing Run |============>\n\nDate: {datetime.datetime.now()}\nFolder: {main_dir}\nn_jobs: {n_jobs}')
 
-    for n, jobs in enumerate(njobs):
-        times.append([])
-        start=time.time()
-        Parallel(n_jobs=jobs,verbose=50)(delayed(preprocess_subject)(subdir, main_dir[n], brainsuite_home) for subdir in os.listdir(main_dir[n]))
-        times[n].append(time.time() - start)
-    np.save("times.txt",times)
+    with open('preproc_log.txt','a') as lt:
+        lt.write(f'<=============| Preprocessing Run |=============>\n\nDate: {datetime.datetime.now()}\nFolder: {main_dir}\nn_jobs: {n_jobs}')
+
+    main_start=time.time()
+    Parallel(n_jobs=1,verbose=50)(delayed(preprocess_subject)(subdir, main_dir, brainsuite_home) for subdir in os.listdir(main_dir))
+    main_dur = time.time() - main_start
+
+    with open('times.txt','a') as tt:
+        tt.write(f'Overall Duration:\t{main_dur}\n')
+    with open('preproc_log.txt', 'a') as lt:
+        lt.write('\n\n')
