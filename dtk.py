@@ -81,12 +81,17 @@ def create_gm(root_dir):
 
 def det_algos(main_path, sub_path, dwi_runs, dtk_path, subj, num_b0s=1):
     bash_cmd(f'mkdir {sub_path}/dwi/dtk/')
+    bash_cmd(f'mkdir {sub_path}/dwi/tracks')
     for run in dwi_runs:
-        bash_cmd(f'{dtk_path}dti_recon {sub_path}/anat/brainsuite/{run}/{run}_T1w_brain.dwi.RAS.correct.nii.gz {sub_path}/dwi/dtk/ -gm {main_path}/siemens_64.txt -b0 {num_b0s}')
-        
+        bash_cmd(f'mkdir {sub_path}/dwi/tracks/{run}')
+        bash_cmd(f'{dtk_path}dti_recon {sub_path}/anat/brainsuite/{run}/{run}_T1w_brain.dwi.RAS.correct.nii.gz {sub_path}/dwi/dtk/{run} -gm {main_path}/siemens_64.txt -b0 {num_b0s}')
+        bash_cmd(f'{dtk_path}dti_tracker {sub_path}/dwi/dtk/{run} {sub_path}/dwi/tracks/{run}/{run}_fact.nii -it 'nii' -fact -m {sub_path}/dwi/dtk/{run}_dwi.nii')
+        bash_cmd(f'{dtk_path}dti_tracker {sub_path}/dwi/dtk/{run} {sub_path}/dwi/tracks/{run}/{run}_rk2.nii -it 'nii' -rk2 -m {sub_path}/dwi/dtk/{run}_dwi.nii')
+        bash_cmd(f'{dtk_path}dti_tracker {sub_path}/dwi/dtk/{run} {sub_path}/dwi/tracks/{run}/{run}_tl.nii -it 'nii' -tl -m {sub_path}/dwi/dtk/{run}_dwi.nii')
+        bash_cmd(f'{dtk_path}dti_tracker {sub_path}/dwi/dtk/{run} {sub_path}/dwi/tracks/{run}/{run}_sl.nii -it 'nii' -sl -m {sub_path}/dwi/dtk/{run}_dwi.nii')
     return
 
-bash_cmd('dti_tracker {} -it {} [-fact -rk2 -tl -sl] -m {}'.format(INPUT_DATA_PREFIX OUTPUT_FILE,'nii.gz'], [mask --> <filename>] ))
+# bash_cmd('dti_tracker {} -it {} [-fact -rk2 -tl -sl] -m {}'.format(INPUT_DATA_PREFIX OUTPUT_FILE,'nii.gz'], [mask --> <filename>] ))
 bash_cmd('odf_tracker {} -it {} [-rk2, default is non-interpolate streamline] -m {}'.format(INPUT_DATA_PREFIX OUTPUT_FILE,[input and output file type --> nii or nii.gz],[mask --> <filename>]  ))
 bash_cmd('spline_filter {} {}'.format(INPUT_TRACK_FILE STEP_LENGTH [in unit of min. voxel size],OUTPUT_TRACK_FILE )) #--> smooth/clean up orig. track file
 bash_cmd('track_transform {} -src {} -ref {}'.format(INPUT_TRACK_FILE OUTPUT_TRACK_FILE,[source vol. file - dwi or b0, nifti], [reference volume tracks are registered to, nifti] )) #--> transform a track file using given registration matrix
@@ -101,6 +106,8 @@ def run_tractography(subject, maindir, dtkdir, init_setup=False):
 
         if init_setup: dtk_setup(dtkdir)
         create_gm(maindir)
+
+    return
 
 
 if __name__ == "__main__":
