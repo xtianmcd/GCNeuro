@@ -12,7 +12,9 @@ def bash_command(string_cmd):
 
 def read_trkfile(run):
 
-    trkfile = nib.streamlines.load()
+    trkfile = nib.streamlines.load(run)
+    tracks = np.asarray(trkfile.tractogram.streamlines)
+    return tracks
 
 def get_trks(subject):
     streamlines={}
@@ -25,8 +27,7 @@ def get_trks(subject):
             trkrun = trkdir+run
             for algo in os.listdir(trkrun):
                 # algo=trkrun+algo_file
-                tracks = nib.streamlines.load(f'{trkrun+algo}')
-                run_algos[f'{algo}'] = np.asarray(tracks.tractogram.streamlines)
+                run_algo[f'{algo}'] = read_trks(f'{trkrun+algo}')
             streamlines[f'{run}'] = run_algos
     return streamlines
 
