@@ -23,7 +23,7 @@ def get_rois(subject):
                     with open(coord_file, 'r') as cf:
                         voxel_info = cf.read()
                     print(voxel_info)
-
+                    
     return
 
 

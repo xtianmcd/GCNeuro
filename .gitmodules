@@ -1,0 +1,3 @@
+[submodule "MVGCN"]
+	path = MVGCN
+	url = https://github.com/sheryl-ai/MVGCN.git

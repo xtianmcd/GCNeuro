@@ -79,23 +79,35 @@ def create_gm(root_dir):
         gm.write('0.266985,   0.959945,   -0.084995')
     return
 
-def det_algos(main_path, sub_path, dwi_runs, dtk_path, subj, num_b0s=1):
+def trk_algos(main_path, sub_path, runs, dtk_path, num_b0s=1):
     bash_cmd(f'mkdir {sub_path}/dwi/dtk/')
     bash_cmd(f'mkdir {sub_path}/dwi/tracks')
-    for run in dwi_runs:
+    for run in runs:
         bash_cmd(f'mkdir {sub_path}/dwi/tracks/{run}')
         bash_cmd(f'{dtk_path}dti_recon {sub_path}/anat/brainsuite/{run}/{run}_T1w_brain.dwi.RAS.correct.nii.gz {sub_path}/dwi/dtk/{run} -gm {main_path}/siemens_64.txt -b0 {num_b0s}')
-        bash_cmd(f'{dtk_path}dti_tracker {sub_path}/dwi/dtk/{run} {sub_path}/dwi/tracks/{run}/{run}_fact.nii -it 'nii' -fact -m {sub_path}/dwi/dtk/{run}_dwi.nii')
-        bash_cmd(f'{dtk_path}dti_tracker {sub_path}/dwi/dtk/{run} {sub_path}/dwi/tracks/{run}/{run}_rk2.nii -it 'nii' -rk2 -m {sub_path}/dwi/dtk/{run}_dwi.nii')
-        bash_cmd(f'{dtk_path}dti_tracker {sub_path}/dwi/dtk/{run} {sub_path}/dwi/tracks/{run}/{run}_tl.nii -it 'nii' -tl -m {sub_path}/dwi/dtk/{run}_dwi.nii')
-        bash_cmd(f'{dtk_path}dti_tracker {sub_path}/dwi/dtk/{run} {sub_path}/dwi/tracks/{run}/{run}_sl.nii -it 'nii' -sl -m {sub_path}/dwi/dtk/{run}_dwi.nii')
+        bash_cmd(f'{dtk_path}dti_tracker {sub_path}/dwi/dtk/{run} {sub_path}/dwi/tracks/{run}/{run}_fact.trk -it nii -fact -m {sub_path}/dwi/dtk/{run}_dwi.nii')
+        bash_cmd(f'{dtk_path}dti_tracker {sub_path}/dwi/dtk/{run} {sub_path}/dwi/tracks/{run}/{run}_rk2.trk -it nii -rk2 -m {sub_path}/dwi/dtk/{run}_dwi.nii')
+        bash_cmd(f'{dtk_path}dti_tracker {sub_path}/dwi/dtk/{run} {sub_path}/dwi/tracks/{run}/{run}_tl.trk -it nii -tl -m {sub_path}/dwi/dtk/{run}_dwi.nii')
+        bash_cmd(f'{dtk_path}dti_tracker {sub_path}/dwi/dtk/{run} {sub_path}/dwi/tracks/{run}/{run}_sl.trk -it nii -sl -m {sub_path}/dwi/dtk/{run}_dwi.nii')
+        # bash_cmd('dti_tracker {} -it {} [-fact -rk2 -tl -sl] -m {}'.format(INPUT_DATA_PREFIX OUTPUT_FILE,'nii.gz'], [mask --> <filename>] ))
+        # bash_cmd('odf_tracker {} -it {} [-rk2, default is non-interpolate streamline] -m {}'.format(INPUT_DATA_PREFIX OUTPUT_FILE,[input and output file type --> nii or nii.gz],[mask --> <filename>]  ))
     return
 
-# bash_cmd('dti_tracker {} -it {} [-fact -rk2 -tl -sl] -m {}'.format(INPUT_DATA_PREFIX OUTPUT_FILE,'nii.gz'], [mask --> <filename>] ))
-bash_cmd('odf_tracker {} -it {} [-rk2, default is non-interpolate streamline] -m {}'.format(INPUT_DATA_PREFIX OUTPUT_FILE,[input and output file type --> nii or nii.gz],[mask --> <filename>]  ))
-bash_cmd('spline_filter {} {}'.format(INPUT_TRACK_FILE STEP_LENGTH [in unit of min. voxel size],OUTPUT_TRACK_FILE )) #--> smooth/clean up orig. track file
-bash_cmd('track_transform {} -src {} -ref {}'.format(INPUT_TRACK_FILE OUTPUT_TRACK_FILE,[source vol. file - dwi or b0, nifti], [reference volume tracks are registered to, nifti] )) #--> transform a track file using given registration matrix
-bash_cmd('track_merge {} {} [...] {} --> merge multiple track files into one'.format(INPUT_TRACK_FILE_1,INPUT_TRACK_FILE_2, ... , OUTPUT_FILE))
+def trk_postproc(runs, sub_path, dtk_path):
+    for run in runs:
+        trkpath = sub_path+'/dwi/tracks/'+run+'/'
+        for trkf in os.listdir(trkpath):
+            if trkf.endswith('.trk'):
+                # trkp = trkpath + trkf
+                trkfltr = trkf.split('.')[0]+'_fltr.trk'
+                bash_cmd(f'{dtk_path}spline_filter {trkpath+trkf} 0.5 {trkpath+trkfltr}')#.format(INPUT_TRACK_FILE STEP_LENGTH [in unit of min. voxel size],OUTPUT_TRACK_FILE )) --> smooth/clean up orig. track file
+    # bash_cmd('track_transform {} -src {} -ref {}'.format(INPUT_TRACK_FILE OUTPUT_TRACK_FILE,[source vol. file - dwi or b0, nifti], [reference volume tracks are registered to, nifti] )) #--> transform a track file using given registration matrix
+    # bash_cmd('track_merge {} {} [...] {} --> merge multiple track files into one'.format(INPUT_TRACK_FILE_1,INPUT_TRACK_FILE_2, ... , OUTPUT_FILE))
+    return
+
+
+
+
 
 def run_tractography(subject, maindir, dtkdir, init_setup=False):
 
@@ -104,8 +116,14 @@ def run_tractography(subject, maindir, dtkdir, init_setup=False):
         print(f'Preprocessing data for {subject}')
         sub = maindir+subject
 
-        if init_setup: dtk_setup(dtkdir)
-        create_gm(maindir)
+        if init_setup: dtk_setup(dtkdir) # Only needed for odf (?)
+
+        dwi_runs = list(['_'.join(f.split('_')[:2]) for f in os.listdir(sub+'/dwi/')\
+         if f.endswith('.json')])
+
+        trk_algos(maindir, sub, dwi_runs, dtkdir)
+
+        trk_postproc(dwi_runs, sub, dtkdir)
 
     return
 
@@ -113,7 +131,8 @@ def run_tractography(subject, maindir, dtkdir, init_setup=False):
 if __name__ == "__main__":
 
     main_dir='/Volumes/ElementsExternal/test2/'
-    dtk_home='/Applications/Diffusion\ Toolkit.app/Contents/MacOS/'
+    dtk_home='/Applications/Diffusion_Toolkit.app/Contents/MacOS/'
 
+    create_gm(main_dir)
     for subdir in os.listdir(main_dir):
         run_tractography(subdir, main_dir, dtk_home)

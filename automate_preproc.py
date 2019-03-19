@@ -32,7 +32,7 @@ def pick_dwi_runs(subject):
     jsons = list([os.path.join(root,i) for root,d,f in os.walk(subject)\
                                         for i in f \
                                         if root.split('/')[-1]=='dwi' \
-                                        and i.endswith('json')])
+                                        and i.endswith('.json')])
     stats_for_topup={}
     for jsonf in jsons:
         """ read through the json header files for each run """

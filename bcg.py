@@ -27,7 +27,7 @@ def get_trks(subject):
             trkrun = trkdir+run
             for algo in os.listdir(trkrun):
                 # algo=trkrun+algo_file
-                run_algo[f'{algo}'] = read_trks(f'{trkrun+algo}')
+                if algo.endswith('.trk'): run_algo[f'{algo}'] = read_trks(f'{trkrun+algo}')
             streamlines[f'{run}'] = run_algos
     return streamlines
 
