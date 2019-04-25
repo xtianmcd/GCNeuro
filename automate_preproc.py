@@ -284,7 +284,7 @@ if __name__ == "__main__":
         lt.write(f'<=============| Preprocessing Run |=============>\n\nDate: {datetime.datetime.now()}\nFolder: {main_dir}\nn_jobs: {n_jobs}')
 
     main_start=time.time()
-    Parallel(n_jobs=1,verbose=50)(delayed(preprocess_subject)(subdir, main_dir, brainsuite_home) for subdir in os.listdir(main_dir))
+    Parallel(n_jobs=1,verbose=50)(delayed(preprocess_subject)(subdir, main_dir, brainsuite_home) for subdir in os.listdir(main_dir) if os.path.isdir(main_dir+subdir))
     main_dur = time.time() - main_start
 
     with open('times.txt','a') as tt:

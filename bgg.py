@@ -7,6 +7,10 @@ import random
 import json
 import pickle
 import nibabel as nib
+from joblib import Parallel, delayed
+import time
+import datetime
+
 
 
 def bash_command(string_cmd):
@@ -43,7 +47,7 @@ def gen_cntrs(main_dir,fs_run):
             cntr_vox = np.mean(idx,axis=0)
             # print(cntr_vox)
             if cntr_vox not in idx: cntr_vox=nearest_voxel(cntr_vox,idx)
-            centers[str(label)]=cntr_vox
+            centers[str(label)]=list(cntr_vox)
     print(centers.keys())
     # cntrs={}
     # ks = sorted([int(k) for k in centers.keys()])
@@ -67,11 +71,32 @@ def get_rois(sub, maindir):
 if __name__=="__main__":
 
     main_dir='/Volumes/ElementsExternal/mridti_test2'
-
+    n_jobs=-2
     subj_centers={}
+
     for subdir in os.listdir(main_dir):
         if os.path.isdir(os.path.join(main_dir,subdir)):
             subj_centers[subdir] = get_rois(subdir, main_dir)
 
+    # with open('times.txt','a') as tt:
+    #     tt.write(f'\n<=============| BGG nodes Run |============>\n\nDate: {datetime.datetime.now()}\nFolder: {main_dir}\nn_jobs: {n_jobs}')
+    #
+    # with open('preproc_log.txt','a') as lt:
+    #     lt.write(f'<=============| BGG nodes Run |=============>\n\nDate: {datetime.datetime.now()}\nFolder: {main_dir}\nn_jobs: {n_jobs}')
+    #
+    # main_start=time.time()
+    # subj_cntrs = Parallel(n_jobs=-2,verbose=50)(delayed(get_rois)(subdir, main_dir) for subdir in os.listdir(main_dir) if os.path.isdir(os.path.join(main_dir,subdir)))
+    #
+    # for subdir in range(len(os.listdir(main_dir))):
+    #     if os.path.isdir(os.path.join(main_dir,os.listdir(main_dir)[subdir])):
+    #         subj_centers[os.listdir(main_dir)[subdir]] = subj_cntrs[subdir]
+    #
     with open(f'{os.path.join(main_dir,"center_vxls.json")}','w') as rois:
         json.dump(subj_centers,rois)
+    #
+    # main_dur = time.time() - main_start
+    #
+    # with open('times.txt','a') as tt:
+    #     tt.write(f'Overall BGG nodes Duration:\t{main_dur}\n')
+    # with open('preproc_log.txt', 'a') as lt:
+    #     lt.write('\n\n')

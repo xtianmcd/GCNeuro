@@ -1,6 +1,10 @@
 import os
 import json
 import subprocess
+import nibabel as nib
+from joblib import Parallel, delayed
+import time
+import datetime
 
 def bash_cmd(cmd):
     process = subprocess.Popen(cmd.split(), stdout=subprocess.PIPE)
@@ -130,9 +134,26 @@ def run_tractography(subject, maindir, dtkdir, init_setup=False):
 
 if __name__ == "__main__":
 
-    main_dir='/Volumes/ElementsExternal/test2/'
+    main_dir='/Volumes/ElementsExternal/mridti_test2/'
     dtk_home='/Applications/Diffusion_Toolkit.app/Contents/MacOS/'
+    n_jobs = -2
 
     create_gm(main_dir)
-    for subdir in os.listdir(main_dir):
-        run_tractography(subdir, main_dir, dtk_home)
+
+    # for subdir in os.listdir(main_dir):
+    #     run_tractography(subdir, main_dir, dtk_home)
+
+    with open('times.txt','a') as tt:
+        tt.write(f'\n<=============| DTK Run |============>\n\nDate: {datetime.datetime.now()}\nFolder: {main_dir}\nn_jobs: {n_jobs}')
+
+    with open('preproc_log.txt','a') as lt:
+        lt.write(f'<=============| DTK Run |=============>\n\nDate: {datetime.datetime.now()}\nFolder: {main_dir}\nn_jobs: {n_jobs}')
+
+    main_start=time.time()
+    Parallel(n_jobs=-2,verbose=50)(delayed(run_tractography)(subdir, main_dir, dtk_home) for subdir in os.listdir(main_dir) if os.path.isdir(main_dir+subdir))
+    main_dur = time.time() - main_start
+
+    with open('times.txt','a') as tt:
+        tt.write(f'Overall DTK Duration:\t{main_dur}\n')
+    with open('preproc_log.txt', 'a') as lt:
+        lt.write('\n\n')

@@ -7,6 +7,9 @@ import json
 # from dipy.tracking.streamline import transform_streamlines
 from dipy.tracking import utils
 from scipy.io import loadmat
+from joblib import Parallel, delayed
+import time
+import datetime
 
 
 def bash_command(string_cmd):
@@ -87,15 +90,24 @@ if __name__=="__main__":
 
     main_dir = '/Volumes/ElementsExternal/mridti_test2/'
     dtk_home='/Applications/Diffusion_Toolkit.app/Contents/MacOS/'
+    n_jobs = -2
 
-    # tracks={}
+    # for subdir in os.listdir(main_dir):
+    #     if os.path.isdir(main_dir+subdir):
+    #         # tracks[f'{subdir}'] = get_trks(subdir,main_dir)
+    #         get_trks(subdir,main_dir,dtk_home)
 
-    for subdir in os.listdir(main_dir):
-        if os.path.isdir(main_dir+subdir):
-            # tracks[f'{subdir}'] = get_trks(subdir,main_dir)
-            get_trks(subdir,main_dir,dtk_home)
+    with open('times.txt','a') as tt:
+        tt.write(f'\n<=============| BCG features Run |============>\n\nDate: {datetime.datetime.now()}\nFolder: {main_dir}\nn_jobs: {n_jobs}')
 
-    # for k in tracks.keys():
-    #     print(k)
-    # np.save(main_dir+'tracks.npy',tracks)
-    # print(tracks['sub-01']['sub-01_run-01']['sub-01_run-01_fact.trk'])
+    with open('preproc_log.txt','a') as lt:
+        lt.write(f'<=============| BCG features Run |=============>\n\nDate: {datetime.datetime.now()}\nFolder: {main_dir}\nn_jobs: {n_jobs}')
+
+    main_start=time.time()
+    Parallel(n_jobs=-2,verbose=50)(delayed(get_trks)(subdir, main_dir, dtk_home) for subdir in os.listdir(main_dir) if os.path.isdir(main_dir+subdir))
+    main_dur = time.time() - main_start
+
+    with open('times.txt','a') as tt:
+        tt.write(f'Overall BCG features Duration:\t{main_dur}\n')
+    with open('preproc_log.txt', 'a') as lt:
+        lt.write('\n\n')
