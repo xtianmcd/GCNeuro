@@ -47,7 +47,7 @@ def gen_cntrs(main_dir,fs_run):
             cntr_vox = np.mean(idx,axis=0)
             # print(cntr_vox)
             if cntr_vox not in idx: cntr_vox=nearest_voxel(cntr_vox,idx)
-            centers[str(label)]=list(cntr_vox)
+            centers[str(label)]=str(cntr_vox)
     print(centers.keys())
     # cntrs={}
     # ks = sorted([int(k) for k in centers.keys()])
