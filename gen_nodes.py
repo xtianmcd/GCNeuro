@@ -87,9 +87,11 @@ if __name__=="__main__":
     # main_start=time.time()
     # subj_cntrs = Parallel(n_jobs=-2,verbose=50)(delayed(get_rois)(subdir, main_dir) for subdir in os.listdir(main_dir) if os.path.isdir(os.path.join(main_dir,subdir)))
     #
-    # for subdir in range(len(os.listdir(main_dir))):
-    #     if os.path.isdir(os.path.join(main_dir,os.listdir(main_dir)[subdir])):
-    #         subj_centers[os.listdir(main_dir)[subdir]] = subj_cntrs[subdir]
+    # sidx = 0
+    # for subdir in os.listdir(main_dir):
+    #     if os.path.isdir(os.path.join(main_dir,subdir):
+    #         subj_centers[subdir] = subj_cntrs[sidx]
+    #         sidx+=1
     #
     with open(f'{os.path.join(main_dir,"center_vxls.json")}','w') as rois:
         json.dump(subj_centers,rois)

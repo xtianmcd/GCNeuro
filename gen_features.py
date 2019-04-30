@@ -25,16 +25,21 @@ def gen_hshtbl(trk):
     return hshtbl
 
 
-def gen_masks(fs_dir,subrun):
+def gen_masks(fs_dir,subrun,vols):
     parcseg = os.path.join(fs_dir,subrun,'mri','aparc+aseg.mgz')
     anat = nib.load(parcseg)
     anat_img = anat.get_fdata().astype(int)
     # anat_aff = anat.affine
     mask_dir = os.path.join(fs_dir,subrun,'seg_masks')
     bash_command(f'mkdir {mask_dir}')
-    for label in np.unique(anat_img):
+    labels=np.unique(anat_img)
+    try:
+        v_ids = np.loadtxt(vols)
+    except FileNotFoundError:
+        print("ERROR: Run gen_nodes.py AND adj_mtx.py first to generate the 'master list' of Volume IDs")
+    for label in v_ids:
         mask = np.ma.array(anat_img, mask = anat_img != label, fill_value=0).filled()
-        np.save(os.path.join(mask_dir,f'{label}_msk'), mask)
+        np.save(os.path.join(mask_dir,f'{int(label)}_msk'), mask)
     return mask_dir,parcseg
 
 def read_trkfile(run):
@@ -45,7 +50,7 @@ def read_trkfile(run):
     ht = gen_hshtbl(trk_img)
     return trk_img,trk_aff,ht
 
-def get_trks(subject, maindir,dtk_path):
+def get_trks(subject, maindir,dtk_path,vol_ids):
     if subject.split('-')[0]=='sub':
         sub = maindir+subject
         trkdir = os.path.join(sub,'dwi','tracks')
@@ -55,7 +60,7 @@ def get_trks(subject, maindir,dtk_path):
             # run_algos={}
             if os.path.isdir(trkrun) and run in os.listdir(fsdir):
                 print(run)
-                maskdir,mgz = gen_masks(fsdir,run)
+                maskdir,mgz = gen_masks(fsdir,run,vol_ids)
                 nii = mgz.split('.')[0]+'.nii'
                 bash_command(f'mri_convert --in_type mgz --out_type nii {mgz} {nii}')
                 bash_command(f'flirt -in {os.path.join(sub,"dwi","dtk",run)}_dwi.nii -ref {nii} -omat {os.path.join(sub,"dwi",run)}_reg.mtx -out {os.path.join(sub,"dwi",run)}_reg')
@@ -71,7 +76,7 @@ def get_trks(subject, maindir,dtk_path):
                         vxl_sl={}
                         for maskf in os.listdir(maskdir):
                             if maskf.endswith('npy'):
-                                print(maskf)
+                                # print(maskf)
                                 mask = np.load(os.path.join(maskdir,maskf))
                                 vxl_sl[maskf.split("_")[0]]=gen_hshtbl(list(utils.target(algo_trks,mask,algo_aff)))
 
@@ -90,6 +95,7 @@ if __name__=="__main__":
 
     main_dir = '/Volumes/ElementsExternal/mridti_test2/'
     dtk_home='/Applications/Diffusion_Toolkit.app/Contents/MacOS/'
+    vols=os.path.join(main_dir,'vols.txt')
     n_jobs = -2
 
     # for subdir in os.listdir(main_dir):
@@ -104,7 +110,7 @@ if __name__=="__main__":
         lt.write(f'<=============| BCG features Run |=============>\n\nDate: {datetime.datetime.now()}\nFolder: {main_dir}\nn_jobs: {n_jobs}')
 
     main_start=time.time()
-    Parallel(n_jobs=-2,verbose=50)(delayed(get_trks)(subdir, main_dir, dtk_home) for subdir in os.listdir(main_dir) if os.path.isdir(main_dir+subdir))
+    Parallel(n_jobs=-2,verbose=50)(delayed(get_trks)(subdir, main_dir, dtk_home, vols) for subdir in os.listdir(main_dir) if os.path.isdir(main_dir+subdir))
     main_dur = time.time() - main_start
 
     with open('times.txt','a') as tt:
