@@ -16,6 +16,8 @@ import torch.nn.functional as F
 from dgl.data import citation_graph as citegrh
 from scipy.stats import chisquare as X2
 from utils import *
+""" This code is borrowed heavily from Thomas Kipf's implementation of a GCN using PyTorch; https://github.com/tkipf/pygcn;
+modified for multiple views and other project-specific implementations """
 
 class GraphConvolution(Module):
     """
