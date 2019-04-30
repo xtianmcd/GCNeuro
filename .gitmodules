@@ -1,3 +1,6 @@
 [submodule "MVGCN"]
 	path = MVGCN
 	url = https://github.com/sheryl-ai/MVGCN.git
+[submodule "pygcn"]
+	path = pygcn
+	url = https://github.com/tkipf/pygcn.git
