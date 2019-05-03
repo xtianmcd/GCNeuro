@@ -20,11 +20,14 @@ def build_A(nodes,maindir):
     np.savetxt(os.path.join(maindir,'vols.txt'),vols)
 
     dists = squareform(pdist(cntrs,metric='euclidean'))
-    dists = dists + np.eye(len(all_nodes))*np.mean(dists,axis=1)
+    # dists = dists + np.eye(len(all_nodes))*np.mean(dists,axis=1)
 
-    kdists =  dists / np.amax(dists, axis=1)[:,np.newaxis]
-
+    # kdists =  dists / np.amax(dists, axis=1)[:,np.newaxis]
+    kdists = np.divide(dists,np.amax(dists))
+    # print(kdists.shape)
+    # print(kdists)
     idx = np.argsort(dists)[:,1:11]
+
     # kdists = np.array([[dists[n][i] for i in idx[n]] for n in range(idx.shape[0])])
     # # wt_kdists = kdists / np.amax(kdists,axis=1)[:,np.newaxis]
 
@@ -32,6 +35,18 @@ def build_A(nodes,maindir):
     for n in range(idx.shape[0]):
         for i in idx[n]:
             A[n][i] = kdists[n][i]
+    # print(A)
+    for r in range(A.shape[0]):
+        for c in range(A.shape[1]):
+            if A[r][c]>0 and A[r][c]!=A[c][r]:
+                A[c][r]=A[r][c]
+
+    A = A + np.eye(len(all_nodes))*np.mean(kdists,axis=1) # add self-connections
+
+    for r in range(A.shape[0]):
+        for c in range(A.shape[1]):
+            if A[r][c]!=A[c][r]:
+                print(f'assymetry at row {r}, col {c}')
     return A
 
 

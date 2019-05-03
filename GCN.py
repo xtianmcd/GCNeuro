@@ -16,8 +16,8 @@ import torch.nn.functional as F
 from dgl.data import citation_graph as citegrh
 from scipy.stats import chisquare as X2
 from utils import *
-""" This code is borrowed heavily from Thomas Kipf's implementation of a GCN using PyTorch; https://github.com/tkipf/pygcn;
-modified for multiple views and other project-specific implementations """
+# from GAT import *
+from layers import *
 
 class GraphConvolution(Module):
     """
@@ -54,278 +54,131 @@ class GraphConvolution(Module):
                + str(self.in_features) + ' -> ' \
                + str(self.out_features) + ')'
 
+class GraphAttentionLayer(nn.Module):
+    """
+    Simple GAT layer, similar to https://arxiv.org/abs/1710.10903
+    """
+
+    def __init__(self, in_features, out_features, dropout, alpha, concat=True):
+        super(GraphAttentionLayer, self).__init__()
+        self.dropout = dropout
+        self.in_features = in_features
+        self.out_features = out_features
+        self.alpha = alpha
+        self.concat = concat
+
+        self.W = nn.Parameter(torch.zeros(size=(in_features, out_features)))
+        nn.init.xavier_uniform_(self.W.data, gain=1.414)
+        self.a = nn.Parameter(torch.zeros(size=(2*out_features, 1)))
+        nn.init.xavier_uniform_(self.a.data, gain=1.414)
+
+        self.leakyrelu = nn.LeakyReLU(self.alpha)
+
+    def forward(self, input, adj):
+        h = torch.mm(input, self.W)
+        N = h.size()[0]
+
+        a_input = torch.cat([h.repeat(1, N).view(N * N, -1), h.repeat(N, 1)], dim=1).view(N, -1, 2 * self.out_features)
+        e = self.leakyrelu(torch.matmul(a_input, self.a).squeeze(2))
+
+        zero_vec = -9e15*torch.ones_like(e)
+        attention = torch.where(adj > 0, e, zero_vec)
+        attention = F.softmax(attention, dim=1)
+        attention = F.dropout(attention, self.dropout, training=self.training)
+        h_prime = torch.matmul(attention, h)
+        if self.concat:
+            return F.elu(h_prime)
+        else:
+            return h_prime
+
+    def __repr__(self):
+        return self.__class__.__name__ + ' (' + str(self.in_features) + ' -> ' + str(self.out_features) + ')'
+
+class SpGAT(nn.Module):
+    def __init__(self, nfeat, nhid, nclass, dropout, nheads, alpha):
+        """Sparse version of GAT."""
+        super(SpGAT, self).__init__()
+        self.dropout = dropout
+
+        self.attentions = [SpGraphAttentionLayer(nfeat,
+                                                 nhid,
+                                                 dropout=dropout,
+                                                 alpha=alpha,
+                                                 concat=True) for _ in range(nheads)]
+        for i, attention in enumerate(self.attentions):
+            self.add_module('attention_{}'.format(i), attention)
+
+        self.out_att = SpGraphAttentionLayer(nhid * nheads,
+                                             nclass,
+                                             dropout=dropout,
+                                             alpha=alpha,
+                                             concat=False)
+
+    def forward(self, x, adj):
+        x = F.dropout(x, self.dropout, training=self.training)
+        x = torch.cat([att(x, adj) for att in self.attentions], dim=1)
+        x = F.dropout(x, self.dropout, training=self.training)
+        x = F.elu(self.out_att(x, adj))
+        return F.log_softmax(x, dim=1)
+
 class GCN(nn.Module):
-    def __init__(self, nfeat, nhid, nclass, dropout):
+    def __init__(self, nin, nhidd, nout, dropout):
         super(GCN, self).__init__()
 
-        self.gc1 = GraphConvolution(nfeat, nhid)
-        self.gc2 = GraphConvolution(nhid, nclass)
+        self.gc1 = GraphConvolution(nin, nhidd)
+        self.gc2 = GraphConvolution(nhidd, nout)
         self.dropout = dropout
 
     def forward(self, x, adj):
         x = F.relu(self.gc1(x, adj))
         x = F.dropout(x, self.dropout, training=self.training)
         x = self.gc2(x, adj)
-        return F.log_softmax(x, dim=1)
+        return x #, dim=1)
 
+class GAT(nn.Module):
+    def __init__(self, nin, nhidd, nout, dropout, nheads, alpha):
+        """Dense version of GAT."""
+        super(GAT, self).__init__()
+        self.dropout = dropout
 
-exp = np.zeros(len(set(np.array(labels))))
-obs = np.zeros(len(set(np.array(labels))))
-for i in labels[idx_train]:
-    exp[labels[idx_train][i]]+=1
-for i in labels[idx_test]:
-    obs[labels[idx_train][i]]+=1
-print(exp)
-print(obs)
-exp = np.multiply(exp,len(labels[idx_test]))[[1,2,4,5,6]]
-obs = np.multiply(obs,len(labels[idx_train]))[[1,2,4,5,6]]
-print(exp)
-print(obs)
+        self.attentions = [GraphAttentionLayer(nin, nhidd, dropout=dropout, alpha=alpha, concat=True) for _ in range(nheads)]
+        for i, attention in enumerate(self.attentions):
+            self.add_module('attention_{}'.format(i), attention)
 
-print(X2(exp,obs))
-print(X2(obs,exp))
+        self.out_att = GraphAttentionLayer(nhidd * nheads, nout, dropout=dropout, alpha=alpha, concat=False)
 
-def train(epoch):
-    t = time.time()
-    model.train()
-    optimizer.zero_grad()
-    output = model(features, adj)
-    loss_train = F.nll_loss(output[idx_train], labels[idx_train])
-    acc_train = accuracy(output[idx_train], labels[idx_train])
-    loss_train.backward()
-    optimizer.step()
+    def forward(self, x, adj):
+        x = F.dropout(x, self.dropout, training=self.training)
+        x = torch.cat([att(x, adj) for att in self.attentions], dim=1)
+        x = F.dropout(x, self.dropout, training=self.training)
+        x = F.elu(self.out_att(x, adj))
+        return F.log_softmax(x, dim=-1)
 
+class GCNPipeLine(nn.Module):
+    def __init__(self, nfeat, nhid, nclass, dropout, nheads, alpha):
+        super(GCNPipeLine,self).__init__()
 
-    # Evaluate validation set performance separately,
-    # deactivates dropout during validation run.
-    model.eval()
-    output = model(features, adj)
+        self.subgc = GCN(nfeat,int(nhid**2),int((nhid**2)/2),dropout)
 
-#     loss_tr = F.nll_loss(output[idx_train], labels[idx_train])
-#     acc_tr  = accuracy(output[idx_train], labels[idx_train])
+        # self.p_gcn = GCN(int((nhid**2)/2),nhid,nclass,dropout)
 
-    loss_val = F.nll_loss(output[idx_val], labels[idx_val])
-    acc_val = accuracy(output[idx_val], labels[idx_val])
-    print('Epoch: {:04d}'.format(epoch+1),
-          'loss_train: {:.4f}'.format(loss_train.item()),
-          'acc_train: {:.4f}'.format(acc_train.item()),
-          'loss_val: {:.4f}'.format(loss_val.item()),
-          'acc_val: {:.4f}'.format(acc_val.item()),
-          'time: {:.4f}s'.format(time.time() - t))
-    return loss_val, acc_val, loss_train, acc_train
+        self.gat = GAT(int((nhid**2)/2), nhid, nclass, dropout, nheads, alpha)
 
+    def forward(self, f, adj):
+        f1 = torch.tanh(self.subgc(f[0], adj))
+        f2 = torch.tanh(self.subgc(f[1], adj))
+        f3 = torch.tanh(self.subgc(f[2], adj))
+        f4 = torch.tanh(self.subgc(f[3], adj))
 
-def test():
-    model.eval()
-    output = model(features, adj)
-    loss_test = F.nll_loss(output[idx_test], labels[idx_test])
-    acc_test = accuracy(output[idx_test], labels[idx_test])
-#     print(output)
-    print("Test set results:",
-          "loss= {:.4f}".format(loss_test.item()),
-          "accuracy= {:.4f}".format(acc_test.item()))
-    return output, loss_test, acc_test
+        xf = torch.cat([f1.view(f1.size()[0],f1.size()[1],1),
+                        f2.view(f1.size()[0],f1.size()[1],1),
+                        f3.view(f1.size()[0],f1.size()[1],1),
+                        f4.view(f1.size()[0],f1.size()[1],1)],-1)
 
-# Training settings
-# parser = argparse.ArgumentParser()
-# parser.add_argument('--no-cuda', action='store_true', default=False,
-#                     help='Disables CUDA training.')
-# parser.add_argument('--fastmode', action='store_true', default=False,
-#                     help='Validate during training pass.')
-# parser.add_argument('--seed', type=int, default=42, help='Random seed.')
-# parser.add_argument('--epochs', type=int, default=200,
-#                     help='Number of epochs to train.')
-# parser.add_argument('--lr', type=float, default=0.01,
-#                     help='Initial learning rate.')
-# parser.add_argument('--weight_decay', type=float, default=5e-4,
-#                     help='Weight decay (L2 loss on parameters).')
-# parser.add_argument('--hidden', type=int, default=16,
-#                     help='Number of hidden units.')
-# parser.add_argument('--dropout', type=float, default=0.5,
-#                     help='Dropout rate (1 - keep probability).')
+        mp = nn.MaxPool1d((4))
+        xp = mp(xf).view(f1.size())
 
-# args = parser.parse_args()
-# args.cuda = not args.no_cuda and torch.cuda.is_available()
-
-np.random.seed(seed)
-torch.manual_seed(seed)
-# if args.cuda:
-#     torch.cuda.manual_seed(args.seed)
-
-# Load data
-adj, features, labels, idx_train, idx_val, idx_test = load_data()
-
-
-""" this is where you make 4 different 'models' to run side by side
-    then you need a pooling operation
-"""
-# Model and optimizer
-model = GCN(nfeat=features.shape[1],
-            nhid=hidden,
-            nclass=labels.max().item() + 1,
-            dropout=dropout)
-if diffpriv: optimizer = DPSGD(model.parameters(),
-                       lr=lr, weight_decay=False,
-                        noise_scale=ns,gclip=C)
-else: optimizer = optim.SGD(model.parameters(),
-                       lr=lr, weight_decay=weight_decay)
-
-seed=42 #42
-epochs=140 #200
-lr=0.01 #0.01
-weight_decay=False #5e-4
-hidden = 32 #16
-dropout=False #0.5
-diffpriv=True
-ns=4.0
-C=1.0
-
-v_losses = []
-v_accs   = []
-tr_losses = []
-tr_accs = []
-
-#Train model
-t_total = time.time()
-for epoch in range(epochs):
-    vloss, vacc, tloss, tacc = train(epoch)
-    v_losses.append(vloss)
-    v_accs.append(vacc*100)
-    tr_losses.append(tloss)
-    tr_accs.append(tacc*100)
-print("Optimization Finished!")
-print("Total time elapsed: {:.4f}s".format(time.time() - t_total))
-
-# Testing
-output,l,a=test()
-
-#Plot
-plot_training(tr_accs,v_accs,tr_losses,v_losses,dp=diffpriv, wt_decay=weight_decay, dropout=dropout)
-
-preds = output.max(1)[1].type_as(labels)
-
-exp = np.zeros(len(set(np.array(labels))))
-obs = np.zeros(len(set(np.array(labels))))
-for i in preds[idx_train]:
-    exp[i]+=1
-for i in preds[idx_test]:
-    obs[i]+=1
-print(exp)
-print(obs)
-exp = np.multiply(exp,len(preds[idx_test]))[[1,3]]
-obs = np.multiply(obs,len(preds[idx_train]))[[1,3]]
-# print(exp)
-# print(obs)
-print(X2(exp,obs))
-print(X2(obs,exp))
-
-wt_decays=[0,0.5, 0.05, 0.005, 0.0005]
-dropouts = [0.1,0.2, 0.5,0.8]
-
-WD_accs=[]
-# WD_losses=[]
-D_accs=[]
-# D_losses=[]
-
-for wd in wt_decays:
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    # if args.cuda:
-    #     torch.cuda.manual_seed(args.seed)
-
-    # Load data
-    adj, features, labels, idx_train, idx_val, idx_test = load_data()
-
-    # Model and optimizer
-    model = GCN(nfeat=features.shape[1],
-                nhid=hidden,
-                nclass=labels.max().item() + 1,
-                dropout=dropout)
-    if diffpriv: optimizer = DPSGD(model.parameters(),
-                           lr=lr, weight_decay=False,
-                            noise_scale=ns,gclip=C)
-    else: optimizer = optim.SGD(model.parameters(),
-                           lr=lr, weight_decay=weight_decay)
-    seed=42 #42
-    epochs=140 #200
-    lr=0.01 #0.01
-    weight_decay=wd #5e-4
-    hidden = 32 #16
-    dropout=False #0.5
-    diffpriv=False
-    ns=3.0
-    C=3.0
-
-    v_losses = []
-    v_accs   = []
-    tr_losses = []
-    tr_accs = []
-
-    #Train model
-    t_total = time.time()
-    for epoch in range(epochs):
-        vloss, vacc, tloss, tacc = train(epoch)
-    #     v_losses.append(vloss)
-    #     v_accs.append(vacc*100)
-    #     tr_losses.append(tloss)
-    #     tr_accs.append(tacc*100)
-    print("Optimization Finished!")
-    print("Total time elapsed: {:.4f}s".format(time.time() - t_total))
-
-    # Testing
-    output,tst_loss, tst_acc=test()
-    WD_accs.append(tst_acc*100)
-#     WD_losses.append(tst_loss)
-
-for d in dropouts:
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    # if args.cuda:
-    #     torch.cuda.manual_seed(args.seed)
-
-    # Load data
-    adj, features, labels, idx_train, idx_val, idx_test = load_data()
-
-    # Model and optimizer
-    model = GCN(nfeat=features.shape[1],
-                nhid=hidden,
-                nclass=labels.max().item() + 1,
-                dropout=dropout)
-    if diffpriv: optimizer = DPSGD(model.parameters(),
-                           lr=lr, weight_decay=False,
-                            noise_scale=ns,gclip=C)
-    else: optimizer = optim.SGD(model.parameters(),
-                           lr=lr, weight_decay=weight_decay)
-    seed=42 #42
-    epochs=140 #200
-    lr=0.01 #0.01
-    weight_decay=False #5e-4
-    hidden = 32 #16
-    dropout=d #0.5
-    diffpriv=False
-    ns=3.0
-    C=3.0
-
-    v_losses = []
-    v_accs   = []
-    tr_losses = []
-    tr_accs = []
-
-    #Train model
-    t_total = time.time()
-    for epoch in range(epochs):
-        vloss, vacc, tloss, tacc = train(epoch)
-    #     v_losses.append(vloss)
-    #     v_accs.append(vacc*100)
-    #     tr_losses.append(tloss)
-    #     tr_accs.append(tacc*100)
-    print("Optimization Finished!")
-    print("Total time elapsed: {:.4f}s".format(time.time() - t_total))
-
-    # Testing
-    output,tst_loss, tst_acc=test()
-    D_accs.append(tst_acc*100)
-#     D_losses.append(tst_loss)
-
-#Plot
-plot_hps(WD_accs,D_accs)
+        # xo = F.log_softmax(self.p_gcn(xp,adj),dim=1)
+        xo = self.gat(xp,adj.to_dense())
+        o = torch.mean(xo, dim=0)
+        return o
