@@ -18,41 +18,34 @@ def chi2(labels):
     print(exp)
     print(obs)
 
-
     print(X2(exp,obs))
     print(X2(obs,exp))
 
     return
 
-def train(epoch):
+def train(epoch, adj, all_feats, labels, model, optimizer):
     t = time.time()
     model.train()
-    output=[]
-    for features in all_feats:
+    o=[]
+    for feats in all_feats:
         optimizer.zero_grad()
-        output.append(model(features, adj))
+        o.append(model(feats, adj))
+    output=torch.stack(o)
     loss_train = F.nll_loss(output, labels)
     acc_train = accuracy(output, labels)
     loss_train.backward()
     optimizer.step()
-#
-#
-#     # Evaluate validation set performance separately,
-#     # deactivates dropout during validation run.
-#     model.eval()
-#     output = model(features, adj)
-#
-# #     loss_tr = F.nll_loss(output[idx_train], labels[idx_train])
-# #     acc_tr  = accuracy(output[idx_train], labels[idx_train])
-#
-#     loss_val = F.nll_loss(output[idx_val], labels[idx_val])
-#     acc_val = accuracy(output[idx_val], labels[idx_val])
-#     print('Epoch: {:04d}'.format(epoch+1),
-#           'loss_train: {:.4f}'.format(loss_train.item()),
-#           'acc_train: {:.4f}'.format(acc_train.item()),
-#           'loss_val: {:.4f}'.format(loss_val.item()),
-#           'acc_val: {:.4f}'.format(acc_val.item()),
-#           'time: {:.4f}s'.format(time.time() - t))
+
+    # model.eval()
+    # loss_val = F.nll_loss(output[idx_val], labels[idx_val])
+    # acc_val = accuracy(output[idx_val], labels[idx_val])
+    print('Epoch: {:04d}'.format(epoch+1),
+        'loss_train: {:.4f}'.format(loss_train.item()),
+        'acc_train: {:.4f}'.format(acc_train.item()),
+        'time: {:.4f}s'.format(time.time() - t))
+        #'loss_val: {:.4f}'.format(loss_val.item()),
+        #'acc_val: {:.4f}'.format(acc_val.item()),
+        #'time: {:.4f}s'.format(time.time() - t))
     return #loss_val, acc_val, loss_train, acc_train
 
 
@@ -61,7 +54,6 @@ def test():
     output = model(features, adj)
     loss_test = F.nll_loss(output[idx_test], labels[idx_test])
     acc_test = accuracy(output[idx_test], labels[idx_test])
-#     print(output)
     print("Test set results:",
           "loss= {:.4f}".format(loss_test.item()),
           "accuracy= {:.4f}".format(acc_test.item()))
@@ -90,15 +82,15 @@ if __name__=='__main__':
     # args = parser.parse_args()
     # args.cuda = not args.no_cuda and torch.cuda.is_available()
 
-    main_dir = '/Volumes/ElementsExternal/mridti_test2/'
+    #main_dir = '/Volumes/ElementsExternal/mridti_test2/'
+    main_dir = '/data/brain/mridti_small'
     # load_data(main_dir,os.path.join(main_dir,'sub-01','dwi','tracks','sub-01_run-01'))
 
     # Load data
-    adj, features, labels  = load_data(main_dir,os.path.join(main_dir,'sub-01','dwi','tracks','sub-01_run-01'))
-    # print(labels)
+    adj, features, labels  = load_data(main_dir)
 
     seed=42 #42
-    epochs=1 #200
+    epochs=10 #200
     lr=0.01 #0.01
     weight_decay=False #5e-4
     hidden = 8 #16
@@ -115,30 +107,8 @@ if __name__=='__main__':
     # if args.cuda:
     #     torch.cuda.manual_seed(args.seed)
 
-
     # Model and optimizer
-    # print(features[0].shape[1])
-    # model = GCN(nfeat=features[0].shape[1],
-    #             nhid=hidden,
-    #             nclass=labels.max().item() + 1,
-    #             dropout=dropout)
-
-    # if args.sparse:
-    # model = SpGAT(nfeat=features.shape[1],
-    #             nhid=args.hidden,
-    #             nclass=int(labels.max()) + 1,
-    #             dropout=args.dropout,
-    #             nheads=args.nb_heads,
-    #             alpha=args.alpha)
-    # else:
-    # model = GAT(nfeat=features.shape[1],
-    #             nhid=args.hidden,
-    #             nclass=int(labels.max()) + 1,
-    #             dropout=args.dropout,
-    #             nheads=args.nb_heads,
-    #             alpha=args.alpha)
-
-    model = GCNPipeLine(nfeat=features[0].shape[1],
+    model = GCNetwork(nfeat=features[0][0].shape[1],
                         nhid=hidden,
                         nclass=labels.max().item() + 1,
                         dropout=dropout,
@@ -153,7 +123,6 @@ if __name__=='__main__':
                            lr=lr, weight_decay=weight_decay)
 
 
-
     v_losses = []
     v_accs   = []
     tr_losses = []
@@ -162,11 +131,11 @@ if __name__=='__main__':
     #Train model
     t_total = time.time()
     for epoch in range(epochs):
-        vloss, vacc, tloss, tacc = train(epoch)
-        v_losses.append(vloss)
-        v_accs.append(vacc*100)
-        tr_losses.append(tloss)
-        tr_accs.append(tacc*100)
+        train(epoch, adj, features, labels, model, optimizer)
+        # v_losses.append(vloss)
+        # v_accs.append(vacc*100)
+        # tr_losses.append(tloss)
+        # tr_accs.append(tacc*100)
     print("Optimization Finished!")
     print("Total time elapsed: {:.4f}s".format(time.time() - t_total))
     """

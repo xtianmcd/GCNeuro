@@ -13,11 +13,8 @@ from torch.nn.parameter import Parameter
 from torch.nn.modules.module import Module
 import torch.nn as nn
 import torch.nn.functional as F
-from dgl.data import citation_graph as citegrh
 from scipy.stats import chisquare as X2
 from utils import *
-# from GAT import *
-from layers import *
 
 class GraphConvolution(Module):
     """
@@ -94,33 +91,6 @@ class GraphAttentionLayer(nn.Module):
     def __repr__(self):
         return self.__class__.__name__ + ' (' + str(self.in_features) + ' -> ' + str(self.out_features) + ')'
 
-class SpGAT(nn.Module):
-    def __init__(self, nfeat, nhid, nclass, dropout, nheads, alpha):
-        """Sparse version of GAT."""
-        super(SpGAT, self).__init__()
-        self.dropout = dropout
-
-        self.attentions = [SpGraphAttentionLayer(nfeat,
-                                                 nhid,
-                                                 dropout=dropout,
-                                                 alpha=alpha,
-                                                 concat=True) for _ in range(nheads)]
-        for i, attention in enumerate(self.attentions):
-            self.add_module('attention_{}'.format(i), attention)
-
-        self.out_att = SpGraphAttentionLayer(nhid * nheads,
-                                             nclass,
-                                             dropout=dropout,
-                                             alpha=alpha,
-                                             concat=False)
-
-    def forward(self, x, adj):
-        x = F.dropout(x, self.dropout, training=self.training)
-        x = torch.cat([att(x, adj) for att in self.attentions], dim=1)
-        x = F.dropout(x, self.dropout, training=self.training)
-        x = F.elu(self.out_att(x, adj))
-        return F.log_softmax(x, dim=1)
-
 class GCN(nn.Module):
     def __init__(self, nin, nhidd, nout, dropout):
         super(GCN, self).__init__()
@@ -154,14 +124,12 @@ class GAT(nn.Module):
         x = F.elu(self.out_att(x, adj))
         return F.log_softmax(x, dim=-1)
 
-class GCNPipeLine(nn.Module):
+class GCNetwork(nn.Module):
     def __init__(self, nfeat, nhid, nclass, dropout, nheads, alpha):
-        super(GCNPipeLine,self).__init__()
+        super(GCNetwork,self).__init__()
 
         self.subgc = GCN(nfeat,int(nhid**2),int((nhid**2)/2),dropout)
-
         # self.p_gcn = GCN(int((nhid**2)/2),nhid,nclass,dropout)
-
         self.gat = GAT(int((nhid**2)/2), nhid, nclass, dropout, nheads, alpha)
 
     def forward(self, f, adj):

@@ -4,3 +4,6 @@
 [submodule "pygcn"]
 	path = pygcn
 	url = https://github.com/tkipf/pygcn.git
+[submodule "pyGAT"]
+	path = pyGAT
+	url = https://github.com/Diego999/pyGAT.git

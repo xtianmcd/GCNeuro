@@ -110,29 +110,64 @@ def sparse_mx_to_torch_sparse_tensor(sparse_mx):
     shape = torch.Size(sparse_mx.shape)
     return torch.sparse.FloatTensor(indices, values, shape)
 
-def load_data(maindir,imdir):
+def load_data(maindir):
     # print('Loading {} dataset...'.format(dataset))
-    labels = np.array([[0,1]]) #encode_onehot([1])
 
     # build graph
     adj = np.load(os.path.join(maindir,'adj_mtrx.npy'))
-    features = gen_feats(imdir)
+    
+    ftrs_dict={}
+    for subdir in os.listdir(maindir):
+        if 'sub-' in subdir:
+            for run in os.listdir(os.path.join(maindir,subdir,'dwi','tracks')):
+                if 'run-' in run:
+                    #print(run)
+                    imdir =  os.path.join(maindir,subdir,'dwi','tracks',run)
+                    if os.path.exists(os.path.join(imdir,'algo_vol-trk_map.json')):
+                        with open(os.path.join(imdir,'algo_vol-trk_map.json'),'r') as a:
+                            j = json.load(a)
+                        #for algo in j.keys():
+                            #print('\t',algo,' ',algo,' ',len(j[algo].keys()))
+                    if os.path.exists(os.path.join(imdir,'feature_mts.npy')):
+                        features = np.load(os.path.join(imdir,'feature_mts.npy')) 
+                    else:
+                        features = gen_feats(imdir)
+                    if len(features):
+                        features = [sp.csr_matrix(ftrs, dtype=np.float32) for ftrs in features]
+                        features = [normalize(ftrs) for ftrs in features]
+                        features = [torch.FloatTensor(np.array(ftrs.todense())) for ftrs in features]
+                        ftrs_dict[run] = features
 
     adj = sp.coo_matrix(adj)
-    features = [sp.csr_matrix(ftrs, dtype=np.float32) for ftrs in features]
-    #
     adj = normalize(adj)
-    features = [normalize(ftrs) for ftrs in features]
+    adj = sparse_mx_to_torch_sparse_tensor(adj)
     #
     # # idx_train = range(140)
     # # idx_val = range(200, 500)
     # # idx_test = range(500, 1500)
     #
-    #
-    features = [torch.FloatTensor(np.array(ftrs.todense())) for ftrs in features]
     # features = torch.cat([ftrs.view(ftrs.size()[0],ftrs.size()[1],1) for ftrs in features],-1)
-    labels = torch.LongTensor(np.where(labels)[1])
-    adj = sparse_mx_to_torch_sparse_tensor(adj)
+    labels=np.genfromtxt(os.path.join(maindir,'labels.txt'),dtype=np.dtype(str))
+    #with open(os.path.join(maindir,'labels.txt'),'r') as l:
+    #    for line in l.readlines():
+    #        labels[line.split('  ')[0]] = line.split('  ')[1].strip().strip('[]')
+
+    ftrs = []
+    lbls = []
+    for key in ftrs_dict.keys():
+        #print(key)
+        ftrs.append(ftrs_dict[key])
+        for i in labels:
+            #print(i[0].decode("utf-8"))
+            if i[0]==key.split('_')[0]:
+                #print(i[0].decode("utf-8"))
+                #print(i)
+                lbls.append([int(i[1]),int(i[2])])
+    
+    #print(lbls)
+    #lbls = encode_onehot(lbls)
+    #print(np.where(lbls)[1])
+    lbls = torch.LongTensor(np.where(lbls)[1])
     # print(features)
     # print(features.size())
     #
@@ -140,7 +175,7 @@ def load_data(maindir,imdir):
     # # idx_val = torch.LongTensor(idx_val)
     # # idx_test = torch.LongTensor(idx_test)
 
-    return adj, features, labels, #idx_train, idx_val, idx_test
+    return adj, ftrs, lbls #,idx_train, idx_val, idx_test
 
 def accuracy(output, labels):
     preds = output.max(1)[1].type_as(labels)
@@ -209,5 +244,6 @@ def plot_hps(WD_acc,D_acc):
 
 if __name__=="__main__":
 
-    main_dir = '/Volumes/ElementsExternal/mridti_test2/'
-    load_data(main_dir,os.path.join(main_dir,'sub-01','dwi','tracks','sub-01_run-01'))
+    #main_dir = '/Volumes/ElementsExternal/mridti_test2/'
+    main_dir = '/data/brain/mridti_small'
+    load_data(main_dir)

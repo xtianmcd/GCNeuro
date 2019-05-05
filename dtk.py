@@ -102,11 +102,8 @@ def trk_postproc(runs, sub_path, dtk_path):
         trkpath = sub_path+'/dwi/tracks/'+run+'/'
         for trkf in os.listdir(trkpath):
             if trkf.endswith('.trk'):
-                # trkp = trkpath + trkf
                 trkfltr = trkf.split('.')[0]+'_fltr.trk'
                 bash_cmd(f'{dtk_path}spline_filter {trkpath+trkf} 0.5 {trkpath+trkfltr}')#.format(INPUT_TRACK_FILE STEP_LENGTH [in unit of min. voxel size],OUTPUT_TRACK_FILE )) --> smooth/clean up orig. track file
-    # bash_cmd('track_transform {} -src {} -ref {}'.format(INPUT_TRACK_FILE OUTPUT_TRACK_FILE,[source vol. file - dwi or b0, nifti], [reference volume tracks are registered to, nifti] )) #--> transform a track file using given registration matrix
-    # bash_cmd('track_merge {} {} [...] {} --> merge multiple track files into one'.format(INPUT_TRACK_FILE_1,INPUT_TRACK_FILE_2, ... , OUTPUT_FILE))
     return
 
 
@@ -134,8 +131,9 @@ def run_tractography(subject, maindir, dtkdir, init_setup=False):
 
 if __name__ == "__main__":
 
-    main_dir='/Volumes/ElementsExternal/mridti_test2/'
-    dtk_home='/Applications/Diffusion_Toolkit.app/Contents/MacOS/'
+    main_dir='/data/brain/mridti_small/'
+    #dtk_home='/Applications/Diffusion_Toolkit.app/Contents/MacOS/'
+    dtk_home = '/data/brain/dtk/'
     n_jobs = -2
 
     create_gm(main_dir)
