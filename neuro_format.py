@@ -16,13 +16,23 @@ Next file to run will be   `make_bids.py`
 """
 
 def move_files(destdir,maindir):
+    """
+    Consolidates files from multi-zip download into a single directory for
+    each subject.
+    """
+
     print(f"Moving files from {maindir} and consolidating into {destdir}\n")
     if not os.path.exists(destdir):
         os.mkdir(destdir)
 
+    # Generate list of full filepaths for each image file
     fileroots = list([os.path.join(root,filename) for root,dirnames,filenames \
                         in os.walk(maindir) if len(root.split('/'))==7 \
                         for filename in filenames])
+
+    # Check if a directory already exists along the filepath to each image,
+    # so that images from the same directory are consolidated together.
+    # Otherwise, create the directory for the image in the destination dir.
     for filepath in fileroots:
         filedest = list([rootd for rootd,dirnamesd,filenamesd \
                         in os.walk(destination)])
@@ -32,10 +42,12 @@ def move_files(destdir,maindir):
                         for dest in filedest if len(dest.split('/'))>=step):
                 os.mkdir(os.path.join(destination,\
                         '/'.join(filepath.split('/')[3:step+1])))
-        os.rename(filepath, destination+'/'.join(filepath.split('/')[3:]))
+        os.rename(filepath, os.path.join(destination,'/'.join(filepath.split('/')[3:])))
     print(f'... empyting {maindir} ...\n')
-    while len(os.listdir(maindir)) > 2:
-        for root, dirnames, filenames in os.walk(main_dir):
+
+    # Empty the Downloads folder
+    while  len(list([dwnld_dir for dwnld_dir in os.listdir(maindir) if os.path.isdir(os.path.join(maindir,dwnld_dir))]))>0: #len(os.listdir(maindir)) > 2:
+        for root, dirnames, filenames in os.walk(maindir):
             if os.path.isfile(os.path.join(root,'.DS_Store')):
                 os.remove(os.path.join(root,'.DS_Store'))
             if os.path.isdir(root):
@@ -48,6 +60,6 @@ if __name__=='__main__':
 
     destination = './'+sys.argv[1]+'/' # path to destination folder
 
-    main_dir = "./JustDownloaded/"
+    main_dir = "./Downloads/"
 
     move_files(destination,main_dir)
