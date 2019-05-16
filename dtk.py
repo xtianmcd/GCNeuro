@@ -119,8 +119,9 @@ def run_tractography(subject, maindir, dtkdir, init_setup=False):
 
         if init_setup: dtk_setup(dtkdir) # Only needed for odf (?)
 
-        dwi_runs = list(['_'.join(f.split('_')[:2]) for f in os.listdir(sub+'/dwi/')\
-         if f.endswith('.json')])
+        dwi_runs = list(['_'.join(f.split('_')[:2]) \
+                    for f in os.listdir(sub+'/dwi/')\
+                    if f.endswith('.json')])
 
         trk_algos(maindir, sub, dwi_runs, dtkdir)
 
@@ -131,9 +132,9 @@ def run_tractography(subject, maindir, dtkdir, init_setup=False):
 
 if __name__ == "__main__":
 
-    main_dir='/data/brain/mridti_small/'
+    main_dir='/data/brain/AnatDiffFunc_27/'
     #dtk_home='/Applications/Diffusion_Toolkit.app/Contents/MacOS/'
-    dtk_home = '/data/brain/dtk/'
+    dtk_home = '/usr/local/dtk/'
     n_jobs = -2
 
     create_gm(main_dir)

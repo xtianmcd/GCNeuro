@@ -22,21 +22,39 @@ Next file to run is `automate_preproc.py`
 
 def re_run(files):
     """ Checks for duplicate timestamps """
-    for f in range(len(files)):
-        i=0
-        for ff in range(len(files)):
-            if files[f].split('/')[2]==files[ff].split('/')[2] and \
-                    files[f].split('/')[4]==files[ff].split('/')[4] and \
-                    files[f].split('/')[3]!=files[ff].split('/')[3]:
-                i+=1
-                newf = files[ff].split('/')
-                nf4_s = int(newf[4].split('_')[-1].split('.')[0])+1
-                nf4_new = '_'.join(newf[4].split('_')[:-1])+str(nf4_s)+'.0'
-                newf[4]=f'{newf[4]}'
-                os.mkdir('/'.join(newf[:5]))
-                newf='/'.join(newf)
-                os.rename(files[ff],os.path.join(newf))
-                files[ff]=newf
+    conflicting=True
+    while conflicting:
+        conflicting=False
+        for f in range(len(files)):
+            i=0
+            for ff in range(len(files)):
+                if files[f].split('/')[2]==files[ff].split('/')[2] and \
+                        files[f].split('/')[4]==files[ff].split('/')[4] and \
+                        files[f].split('/')[3]!=files[ff].split('/')[3]:
+                    conflicting=True
+                    i+=1
+                    print(i)
+                    newf = files[ff].split('/')
+                    nf4_s = int(newf[4].split('_')[-1].split('.')[0])+i # if causes problems, change i back to 1
+                    if nf4_s>59: nf4_s=nf4_s-59-1
+                    if nf4_s<=9: nf4_new = '_'.join(newf[4].split('_')[:-1])+'_0'+str(nf4_s)+'.0'
+                    else: nf4_new = '_'.join(newf[4].split('_')[:-1])+'_'+str(nf4_s)+'.0'
+                    newf[4]=nf4_new
+                    print(newf)
+                    os.mkdir('/'.join(newf[:5]))
+                    # if not os.path.exists('/'.join(newf[:5])): os.mkdir('/'.join(newf[:5]))
+                    # else:
+                    #     print('path exists, else loop called')
+                    #     while os.path.exists('/'.join(newf[:5])):
+                    #         nf4_s = int(newf[4].split('_')[-1].split('.')[0])+1
+                    #         if nf4_s>59: nf4_s=nf4_s-59-1
+                    #         if nf4_s<=9: nf4_new = '_'.join(newf[4].split('_')[:-1])+'_0'+str(nf4_s)+'.0'
+                    #         else: nf4_new = '_'.join(newf[4].split('_')[:-1])+'_'+str(nf4_s)+'.0'
+                    #         newf[4]=nf4_new
+                    #     os.mkdir('/'.join(newf[:5]))
+                    newf='/'.join(newf)
+                    os.rename(files[ff],os.path.join(newf))
+                    files[ff]=newf
     return files
 
 def bidsify(files,runsdict,modality_fn,modality_dn,modality_src,srcdata,derivs,sub,maindir,procdiffs=None):
@@ -44,18 +62,27 @@ def bidsify(files,runsdict,modality_fn,modality_dn,modality_src,srcdata,derivs,s
         os.mkdir(os.path.join(srcdata,sub))
     if not os.path.exists(os.path.join(srcdata,sub,modality_src)):
         os.mkdir(os.path.join(srcdata,sub,modality_src))
+    ses=0
     for f in files:
+        conflicting=False
+        print(f.split('/')[4].split('.')[0])
         run = [k+1 for k in runsdict.keys() if runsdict[k]==f.split('/')[4].split('.')[0]][0]
         if int(run)<=9:
             run=f'0{run}'
         else:
             run=str(run)
-        newfn = os.path.join(sub,f'_run-{run}_{modality_fn}.nii')
+        newfn = f'{sub}_run-{run}_{modality_fn}'
         newdir = os.path.join(maindir,sub,modality_dn)
+        for ff in files:
+            if f.split('/')[:5]==ff.split('/')[:5] and f.split('/')[:6]!=ff.split('/')[:6]:
+                ses+=1
+                newfn=newfn.split('.')[0]+f'_ses-{ses}'+newfn.split('.')[-1]
+                conflicting=True
         cmd = "dcm2niix -b y -o {} -f {} {}".format(newdir,newfn,f)
         process = subprocess.Popen(cmd.split(), stdout=subprocess.PIPE)
         output, error = process.communicate()
-        os.rename(f,os.path.join(srcdata,sub,modality_src,f'{sub}_run-{run}/'))
+        if conflicting: os.rename(f,os.path.join(srcdata,sub,modality_src,f'{sub}_run-{run}_ses-{ses}/'))
+        else: os.rename(f,os.path.join(srcdata,sub,modality_src,f'{sub}_run-{run}/'))
     if modality_fn=='dwi':
         if not os.path.exists(os.path.join(derivs,sub)):
             os.mkdir(os.path.join(derivs,sub))
@@ -90,9 +117,9 @@ def re_format(maindir,metadata):
 
     sub=0
     for subj in subj_dirs:
-        print(f"File structure for {subj}")
         subject = os.path.join(main_dir,subj)
         if os.path.isdir(subject):
+            print(f"File structure for {subj}")
             run=0
             sub+=1
             if sub<=9: sub_name = "sub-0{}".format(sub)
@@ -148,7 +175,7 @@ def re_format(maindir,metadata):
             # print(sorteddates)
 
             runs = dict(enumerate(sorteddates))
-            # print(runs)
+            print(runs)
 
             # For each modality,
             # Convert images to NIfTI and rearrange file structure

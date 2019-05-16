@@ -158,7 +158,7 @@ def skull_strip_dwi(subject, nii_name):
     print()
     return
 
-def run_eddy(hdr_info, subject, topup_ran):
+def run_eddy(hdr_info, subject, topup_ran, proc='_openmp'):
     print("\tRun eddy for each run")
     ind=0
     if topup_ran:
@@ -181,8 +181,8 @@ def run_eddy(hdr_info, subject, topup_ran):
             index_txt.write(indx)
             index_txt.write(' ')
         bash_cmd(\
-            'eddy_openmp --imain={}/dwi/{}.nii --mask={}/dwi/{}_brain_mask --acqp={}/dwi/acq.txt --index={}/dwi/index{}.txt --bvecs={}/dwi/{}.bvec --bvals={}/dwi/{}.bval {} --out={}/dwi/{}_eddy_corr'\
-                .format(subject,run, subject,mask_prefix,\
+            'eddy{} --imain={}/dwi/{}.nii --mask={}/dwi/{}_brain_mask --acqp={}/dwi/acq.txt --index={}/dwi/index{}.txt --bvecs={}/dwi/{}.bvec --bvals={}/dwi/{}.bval {} --out={}/dwi/{}_eddy_corr'\
+                .format(proc, subject,run, subject,mask_prefix,\
                  subject, subject, ind, subject,run, subject,run,\
                  topup_flag, subject,run))
     print()
@@ -216,7 +216,7 @@ def run_brainsuite(subject, hdr_info, bs_home, topup_ran):
         bash_cmd('sh {}/dwi/{}_run_bdp.sh'.format(subject,run))
     return
 
-def run_freesurfer(main_dir, subject, sub_dir):
+def run_freesurfer(main_dir, subject, sub_dir, proc=''):
     print(" Anatomy (MRI)")
     print("+=============+")
     print("\tPerforming Freesurfer for each run")
@@ -226,13 +226,28 @@ def run_freesurfer(main_dir, subject, sub_dir):
     for anatfile in os.listdir(anatdir):
         if anatfile.endswith('.nii'):
             print("\t\trun {}".format(anatfile))
-            bash_cmd('recon-all -sd {} -s {} -i {} -all'\
-            .format(anatdir+'/freesurfer', sub_dir+'_'+anatfile.split('_')[1], \
+            bash_cmd('recon-all {} -sd {} -s {} -i {} -all'\
+            .format(proc, anatdir+'/freesurfer', sub_dir+'_'+anatfile.split('_')[1], \
             anatdir+'/'+anatfile))
     print("\n")
     return
 
-def preprocess_subject(subject, maindir, brainsuitedir, init_setup=False):
+def fmriprep(main_dir, subject, sub_dir):
+    print(" Functional MRI Pocessing")
+    print("+=========================+")
+    print("\tUsing C-PAC for each run")
+
+    # funcdir = os.path.join(subject,'func')
+    # for funcfile in os.listdir(funcdir):
+    #     if funcfile.endswith('.nii'):
+    #         print("\t\trun {funcfile}")
+
+    bash_cmd(f"sudo docker run -i --rm --n_cpus {ncpus} -v {main_dir}:/bids_dataset -v {main_dir}/func_output:/outputs -v /tmp:/scratch fcpindi/c-pac:latest /bids_dataset /outputs participant")
+    # bash_cmd(f"sudo docker run -i --rm --n_cpus {ncpus} -v {main_dir}/func_outputs:/bids_dataset -v {main_dir}/group_outputs:/outputs -v /tmp:/scratch fcpindi/c-pac:latest /bids_dataset /outputs group")
+
+    return
+
+def preprocess_subject(subject, maindir, brainsuitedir, gpu=False, init_setup=False):
     start=time.time()
     if init_setup: fsl_fs_setup()
 
@@ -256,11 +271,19 @@ def preprocess_subject(subject, maindir, brainsuitedir, init_setup=False):
 
         # skull_strip(sub, list(topup_stats.keys()), use_topup)
 
-        run_eddy(stats_topup, sub, use_topup)
+        if gpu: eddyproc = '_cuda'
+        else: eddyproc = '_openmp'
+
+        run_eddy(stats_topup, sub, use_topup, eddyproc)
 
         run_brainsuite(sub, stats_topup, brainsuitedir, use_topup)
 
-        run_freesurfer(maindir,sub,subject)
+        if gpu: fsproc = '-use-cuda'
+        else: fsproc = '-openmp 4'
+
+        run_freesurfer(maindir,sub,subject, fsproc)
+
+        # fmriprep(maindir,sub,subject)
 
         print(f"+===========+\nDone with {subject}\n+===========+")
 
@@ -273,9 +296,9 @@ def preprocess_subject(subject, maindir, brainsuitedir, init_setup=False):
 
 if __name__ == "__main__":
 
-    main_dir = '/data/brain/mridti_small/'
-    brainsuite_home = '/data/brain/BrainSuite18a'
-    n_jobs=1
+    main_dir = '/data/brain/AnatDiffFunc_27/'
+    brainsuite_home = '/opt/BrainSuite18a'
+    n_jobs = 23
 
     with open('times.txt','a') as tt:
         tt.write(f'\n<=============| Preprocessing Run |============>\n\nDate: {datetime.datetime.now()}\nFolder: {main_dir}\nn_jobs: {n_jobs}')
