@@ -1,0 +1,59 @@
+#!/bin/bash
+
+echo "Install dependencies"
+sudo apt-get update
+sudo apt-get --assume-yes install bzip2 git libxml2-dev unzip emacs tmux tcsh
+
+echo "Anaconda"
+wget https://repo.anaconda.com/archive/Anaconda3-2019.03-Linux-x86_64.sh
+bash Anaconda3-2019.03-Linux-x86_64.sh -b -p /home/xtian/anaconda3
+rm Anaconda3-2019.03-Linux-x86_64.sh
+echo 'export PATH=/home/xtian/anaconda3/bin:$PATH' >>~/.bashrc
+source ~/.bashrc
+sudo apt --assume-yes install python3-pip
+pip install joblib nibabel --user
+
+echo 'export BUCKET_DIR=ppmi-full' >>~/.bashrc
+source ~/.bashrc
+echo "Download data from "$BUCKET_DIR
+gsutil cp -r "gs://$BUCKET_DIR/preproc$FOLDER_NUM" .
+
+echo "Freesurfer"
+wget https://surfer.nmr.mgh.harvard.edu/pub/dist/freesurfer/6.0.0/freesurfer-Linux-centos6_x86_64-stable-pub-v6.0.0.tar.gz
+tar -zxvf freesurfer-Linux-centos6_x86_64-stable-pub-v6.0.0.tar.gz
+echo 'export FREESURFER_HOME=/home/xtian/freesurfer' >>~/.bashrc
+echo 'source $FREESURFER_HOME/SetUpFreeSurfer.sh' >>~/.bashrc
+rm freesurfer-Linux-centos6_x86_64-stable-pub-v6.0.0.tar.gz
+
+echo "FSL"
+wget https://fsl.fmrib.ox.ac.uk/fsldownloads/fslinstaller.py
+python2 fslinstaller.py -d /home/xtian/fsl -q
+echo 'FSLDIR=/home/xtian/fsl' >>~/.bashrc
+echo 'PATH=${FSLDIR}/bin:${PATH}' >>~/.bashrc
+echo 'export FSLDIR PATH' >>~/.bashrc
+echo '. ${FSLDIR}/etc/fslconf/fsl.sh' >>~/.bashrc
+
+echo "MATLAB"
+wget http://ssd.mathworks.com/supportfiles/downloads/R2015b/deployment_files/R2015b/installers/glnxa64/MCR_R2015b_glnxa64_installer.zip
+unzip MCR_R2015b_glnxa64_installer.zip
+sudo ./install -mode silent -agreeToLicense yes
+rm MCR_R2015b_glnxa64_installer.zip
+
+echo "BrainSuite"
+gsutil cp "gs://$BUCKET_DIR/BrainSuite19a.linux.tar" .
+tar -xvf BrainSuite19a.linux.tar
+rm BrainSuite19a.linux.tar
+
+echo "Diffusion Toolkit"
+gsutil cp "gs://$BUCKET_DIR/Diffusion_Toolkit_v0.6.4.1_x86_64.tar" .
+tar -xvf Diffusion_Toolkit_v0.6.4.1_x86_64.tar
+rm Diffusion_Toolkit_v0.6.4.1_x86_64.tar
+
+echo "Preproc Files"
+gsutil cp "gs://$BUCKET_DIR/automate_preproc.py" .
+gsutil cp "gs://$BUCKET_DIR/dtk.py" .
+
+
+source ~/.bashrc
+
+echo "Done! Ready to run preprocessing."
