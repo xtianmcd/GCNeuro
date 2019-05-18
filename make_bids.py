@@ -76,7 +76,7 @@ def bidsify(files,runsdict,modality_fn,modality_dn,modality_src,srcdata,derivs,s
         for ff in files:
             if f.split('/')[:5]==ff.split('/')[:5] and f.split('/')[:6]!=ff.split('/')[:6]:
                 ses+=1
-                newfn=newfn.split('.')[0]+f'_ses-{ses}'+newfn.split('.')[-1]
+                newfn=newfn.split('.')[0]+f'_ses-{ses}'
                 conflicting=True
         cmd = "dcm2niix -b y -o {} -f {} {}".format(newdir,newfn,f)
         process = subprocess.Popen(cmd.split(), stdout=subprocess.PIPE)

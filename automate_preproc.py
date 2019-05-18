@@ -5,6 +5,8 @@ from joblib import Parallel, delayed
 import time
 import numpy as np
 import datetime
+import sys
+import nibabel as nib
 
 def bash_cmd(cmd):
     process = subprocess.Popen(cmd.split(), stdout=subprocess.PIPE)#, stderr=subprocess.STDOUT)
@@ -167,24 +169,26 @@ def run_eddy(hdr_info, subject, topup_ran, proc='_openmp'):
         mask_prefix = subject.split('/')[-1]+'_topup_b0'
     else: topup_flag = ''
     for run in list(hdr_info.keys()):
-        """ run eddy on each run """
-        print("\t\tRun {}".format(run))
-        if not topup_ran:
-            mask_prefix = run
-        ind +=1
-        # bash_cmd('indx = ""')
-        indx = ''
-        # bash_cmd('for ((i=1;i<=65;i+=1));do indx="$indx {}"; done'.format(ind))
-        indx = ' '.join(list([str(ind) for _ in range(1,66)]))
-        # bash_cmd('echo $indx > index.txt')
-        with open (subject+'/dwi/index{}.txt'.format(ind), 'w') as index_txt:
-            index_txt.write(indx)
-            index_txt.write(' ')
-        bash_cmd(\
-            'eddy{} --imain={}/dwi/{}.nii --mask={}/dwi/{}_brain_mask --acqp={}/dwi/acq.txt --index={}/dwi/index{}.txt --bvecs={}/dwi/{}.bvec --bvals={}/dwi/{}.bval {} --out={}/dwi/{}_eddy_corr'\
-                .format(proc, subject,run, subject,mask_prefix,\
-                 subject, subject, ind, subject,run, subject,run,\
-                 topup_flag, subject,run))
+        """ run eddy on each run, if not already done """
+        if not f'{run}_eddy_corr' in ''.join(os.listdir(os.path.join(subject,'dwi'))):
+            print("\t\tRun {}".format(run))
+            if not topup_ran:
+                mask_prefix = run
+            ind +=1
+            # bash_cmd('indx = ""')
+            indx = ''
+            # bash_cmd('for ((i=1;i<=65;i+=1));do indx="$indx {}"; done'.format(ind))
+            vols = nib.load(os.path.join(subject,'dwi',run+'.nii')).shape[3]
+            indx = ' '.join(list([str(ind) for _ in range(1,vols+1)]))
+            # bash_cmd('echo $indx > index.txt')
+            with open (subject+'/dwi/index{}.txt'.format(ind), 'w') as index_txt:
+                index_txt.write(indx)
+                index_txt.write(' ')
+            bash_cmd(\
+                'eddy{} --imain={}/dwi/{}.nii --mask={}/dwi/{}_brain_mask --acqp={}/dwi/acq.txt --index={}/dwi/index{}.txt --bvecs={}/dwi/{}.bvec --bvals={}/dwi/{}.bval {} --out={}/dwi/{}_eddy_corr'\
+                    .format(proc, subject,run, subject,mask_prefix,\
+                     subject, subject, ind, subject,run, subject,run,\
+                     topup_flag, subject,run))
     print()
     return
 
@@ -192,43 +196,63 @@ def run_brainsuite(subject, hdr_info, bs_home, topup_ran):
     print("\tRunning BrainSuite...")
     if topup_ran: dwi_mask = '{}/dwi/{}_topup_b0_brain_mask'\
         .format(subject,subject.split('/')[-1])
-    bash_cmd('mkdir {}/anat/brainsuite'.format(subject))
+    if not os.path.exists(os.path.join(subject,'anat','brainsuite')): bash_cmd('mkdir {}/anat/brainsuite'.format(subject))
     for run in list(hdr_info.keys()):
         print("\tPerforming dwi-mri co-registration for run {}"\
             .format(run))
-        print("\t\t\t... skull strip re: anatomical image")
-        bash_cmd('{}/bin/bse -i {}/anat/{}_T1w -o {}/anat/brainsuite/{}_T1w_bdp_brain --mask {}/anat/brainsuite/{}_T1w_bdp_brain_mask'\
-            .format(bs_home, subject,'_'.join(run.split('_')[:2]),\
-                    subject,'_'.join(run.split('_')[:2]),\
-                    subject,'_'.join(run.split('_')[:2])))
-        print("\t\t\t... Bias Field Correction on anatomical image")
-        bash_cmd('{}/bin/bfc -i {}/anat/brainsuite/{}_T1w_bdp_brain -o {}/anat/brainsuite/{}_T1w_brain.bfc'\
-            .format(bs_home, subject, '_'.join(run.split('_')[:2]),\
-                             subject, '_'.join(run.split('_')[:2])))
-        print("\t\t\t... running brainsuite diffusion pipeline (BDP)")
-        if not topup_ran: dwi_mask = '{}/dwi/{}_brain_mask'.format(subject,run)
-        with open('{}/dwi/{}_run_bdp.sh'.format(subject,run),'w') as bdp_sh:
-            bdp_sh.write('{}/bdp/bdp.sh {}/anat/brainsuite/{}_T1w_brain.bfc.nii.gz --output-diffusion-coordinate --output-subdir {} --dir=\"{}\" --t1-mask {}/anat/brainsuite/{}_T1w_bdp_brain_mask.nii.gz --dwi-mask {}.nii.gz --nii {}/dwi/{}_eddy_corr.nii.gz -g {}/dwi/{}_eddy_corr.eddy_rotated_bvecs -b {}/dwi/{}.bval'\
-                .format(bs_home, subject,'_'.join(run.split('_')[:2]), \
-                           '_'.join(run.split('_')[:2]), hdr_info[run]['bdp'], \
-                           subject,'_'.join(run.split('_')[:2]), dwi_mask, subject,run, subject,run, subject,run))
+        if not f"{'_'.join(run.split('_')[:2])}_T1w_bdp_brain.nii" in ''.join(os.listdir(os.path.join(subject,'anat','brainsuite'))):
+            print("\t\t\t... skull strip re: anatomical image")
+            diff = 100
+            anatr=''
+            for anatf in os.listdir(os.path.join(subject,'anat')):
+                if anatf.endswith('nii'):
+                    d = abs(int(run.split('_')[1].split('-')[1])-int(anatf.split('_')[1].split('-')[1]))
+                    if d<diff:
+                        diff=d
+                        anatr = anatf
+                    if d==diff:
+                        if int(anatf.split('_')[1].split('-')[1])<int(anatr.split('_')[1].split('-')[1]):
+                            anatr = anatf
+            bash_cmd('{}/bin/bse -i {}/anat/{} -o {}/anat/brainsuite/{}_T1w_bdp_brain --mask {}/anat/brainsuite/{}_T1w_bdp_brain_mask'\
+                .format(bs_home, subject,anatr,\
+                        subject,'_'.join(run.split('_')[:2]),\
+                        subject,'_'.join(run.split('_')[:2])))
+        if not f"{'_'.join(run.split('_')[:2])}_T1w_brain.bfc" in ''.join(os.listdir(os.path.join(subject,'anat','brainsuite'))):
+            print("\t\t\t... Bias Field Correction on anatomical image")
+            bash_cmd('{}/bin/bfc -i {}/anat/brainsuite/{}_T1w_bdp_brain -o {}/anat/brainsuite/{}_T1w_brain.bfc'\
+                .format(bs_home, subject, '_'.join(run.split('_')[:2]),\
+                                 subject, '_'.join(run.split('_')[:2])))
+        if not os.path.exists(os.path.join(\
+                    subject,'anat','brainsuite','_'.join(run.split('_')[:2]))) \
+                    or not os.path.exists(os.path.join(\
+                    subject,'anat','brainsuite','_'.join(run.split('_')[:2]),\
+                    f"{'_'.join(run.split('_')[:2])}_T1w_brain.dwi.RAS.correct.mADC.T1_coord.nii.gz")):
+            print("\t\t\t... running brainsuite diffusion pipeline (BDP)")
+            if not topup_ran: dwi_mask = '{}/dwi/{}_brain_mask'.format(subject,run)
+            with open('{}/dwi/{}_run_bdp.sh'.format(subject,run),'w') as bdp_sh:
+                bdp_sh.write('{}/bdp/bdp.sh {}/anat/brainsuite/{}_T1w_brain.bfc.nii.gz --output-diffusion-coordinate --output-subdir {} --dir=\"{}\" --t1-mask {}/anat/brainsuite/{}_T1w_bdp_brain_mask.nii.gz --dwi-mask {}.nii.gz --nii {}/dwi/{}_eddy_corr.nii.gz -g {}/dwi/{}_eddy_corr.eddy_rotated_bvecs -b {}/dwi/{}.bval'\
+                    .format(bs_home, subject,'_'.join(run.split('_')[:2]), \
+                               '_'.join(run.split('_')[:2]), hdr_info[run]['bdp'], \
+                               subject,'_'.join(run.split('_')[:2]), dwi_mask, subject,run, subject,run, subject,run))
 
-        bash_cmd('sh {}/dwi/{}_run_bdp.sh'.format(subject,run))
+            bash_cmd('sh {}/dwi/{}_run_bdp.sh'.format(subject,run))
     return
 
 def run_freesurfer(main_dir, subject, sub_dir, proc=''):
     print(" Anatomy (MRI)")
     print("+=============+")
     print("\tPerforming Freesurfer for each run")
-    anatdir = subject+'/anat'
-    bash_cmd('mkdir {}'.format(anatdir+'/freesurfer'))
+    anatdir = os.path.join(subject,'anat')
+    if not os.path.exists(os.path.join(anatdir,'freesurfer')):
+        bash_cmd(f'mkdir {os.path.join(anatdir,"freesurfer")}')
 
     for anatfile in os.listdir(anatdir):
         if anatfile.endswith('.nii'):
-            print("\t\trun {}".format(anatfile))
-            bash_cmd('recon-all {} -sd {} -s {} -i {} -all'\
-            .format(proc, anatdir+'/freesurfer', sub_dir+'_'+anatfile.split('_')[1], \
-            anatdir+'/'+anatfile))
+            if not os.path.exists(os.path.join(anatdir,'freesurfer',f"{anatfile.split('_T1w')[0]}",'mri','aparc+aseg.nii')):
+                print("\t\trun {}".format(anatfile))
+                bash_cmd('recon-all {} -sd {} -s {} -i {} -all'\
+                .format(proc, anatdir+'/freesurfer', sub_dir+'_'+anatfile.split('_')[1], \
+                anatdir+'/'+anatfile))
     print("\n")
     return
 
@@ -260,14 +284,20 @@ def preprocess_subject(subject, maindir, brainsuitedir, gpu=False, init_setup=Fa
         topup_stats,topup_runs,use_topup = pick_dwi_runs(sub)
 
         if use_topup:
-            merge_b0s(sub,topup_runs,use_topup)
-            stats_topup = run_topup(topup_stats, maindir, sub)
-            skull_strip_dwi(sub, sub.split('/')[-1]+'_topup_b0')
+            if not os.path.exists(os.path.join(sub,'dwi','b0merge.nii.gz')) and not os.path.exists(os.path.join(sub,'dwi','b0merge.nii')):
+                merge_b0s(sub,topup_runs,use_topup)
+            if not 'topup' in ''.join(os.listdir(os.path.join(sub,'dwi'))):
+                stats_topup = run_topup(topup_stats, maindir, sub)
+            else: stats_topup = create_acq(topup_stats,sub)
+            if not 'topup_b0_brain' in ''.join(os.listdir(os.path.join(sub,'dwi'))):
+                skull_strip_dwi(sub, sub.split('/')[-1]+'_topup_b0')
         else:
-            merge_b0s(sub,list(topup_stats.keys()),use_topup)
+            if not os.path.exists(os.path.join(sub,'dwi','b0merge.nii.gz')) and not os.path.exists(os.path.join(sub,'dwi','b0merge.nii')):
+                merge_b0s(sub,list(topup_stats.keys()),use_topup)
             stats_topup = create_acq(topup_stats, sub)
             for run in list(stats_topup.keys()):
-                skull_strip_dwi(sub, run)
+                if not f'{run}_brain' in ''.join(os.listdir(os.path.join(sub,'dwi'))):
+                    skull_strip_dwi(sub, run)
 
         # skull_strip(sub, list(topup_stats.keys()), use_topup)
 
@@ -279,7 +309,7 @@ def preprocess_subject(subject, maindir, brainsuitedir, gpu=False, init_setup=Fa
         run_brainsuite(sub, stats_topup, brainsuitedir, use_topup)
 
         if gpu: fsproc = '-use-cuda'
-        else: fsproc = '-openmp 4'
+        else: fsproc = '' #'-openmp 4'
 
         run_freesurfer(maindir,sub,subject, fsproc)
 
@@ -296,9 +326,9 @@ def preprocess_subject(subject, maindir, brainsuitedir, gpu=False, init_setup=Fa
 
 if __name__ == "__main__":
 
-    main_dir = '/data/brain/AnatDiffFunc_27/'
-    brainsuite_home = '/opt/BrainSuite18a'
-    n_jobs = 23
+    main_dir = '/Volumes/ElementsExternal/mridti_test2/' #f'/home/xtian/preproc{sys.argv[1]}/'
+    brainsuite_home = '/Applications/BrainSuite18a' #'/usr/local/BrainSuite19a'
+    n_jobs = 1 #23
 
     with open('times.txt','a') as tt:
         tt.write(f'\n<=============| Preprocessing Run |============>\n\nDate: {datetime.datetime.now()}\nFolder: {main_dir}\nn_jobs: {n_jobs}')
@@ -307,7 +337,7 @@ if __name__ == "__main__":
         lt.write(f'<=============| Preprocessing Run |=============>\n\nDate: {datetime.datetime.now()}\nFolder: {main_dir}\nn_jobs: {n_jobs}')
 
     main_start=time.time()
-    Parallel(n_jobs=1,verbose=50)(delayed(preprocess_subject)(subdir, main_dir, brainsuite_home) for subdir in os.listdir(main_dir) if os.path.isdir(main_dir+subdir))
+    Parallel(n_jobs=n_jobs,verbose=50)(delayed(preprocess_subject)(subdir, main_dir, brainsuite_home) for subdir in os.listdir(main_dir) if os.path.isdir(main_dir+subdir))
     main_dur = time.time() - main_start
 
     with open('times.txt','a') as tt:
