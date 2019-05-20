@@ -97,23 +97,24 @@ def re_format(maindir,metadata):
     subj_dirs = os.listdir(main_dir)
     metadata=os.path.join(main_dir,metadata)
 
-    jsondict = {
-        "Name":maindir,
-        "BIDSVersion": "1.0.0rc1"
-    }
-
+    # jsondict = {
+    #     "Name":maindir,
+    #     "BIDSVersion": "1.0.0rc1"
+    # }
+    #
     metadf = pd.read_csv(metadata)
     metadf["Subject_Num"]=""
+    metadf["Run_Num"]=""
+    #
+    # with open(os.path.join(main_dir,'dataset_description.json'), 'w') as outfile:
+    #     json.dump(jsondict, outfile)
 
-    with open(os.path.join(main_dir,'dataset_description.json'), 'w') as outfile:
-        json.dump(jsondict, outfile)
-
-    srcdata = os.path.join(main_dir,'sourcedata/')
-    if not os.path.exists(srcdata):
-        os.mkdir(srcdata)
-    derivs = os.path.join(main_dir,'derivatives')
-    if not os.path.exists(derivs):
-        os.mkdir(derivs)
+    # srcdata = os.path.join(main_dir,'sourcedata/')
+    # if not os.path.exists(srcdata):
+    #     os.mkdir(srcdata)
+    # derivs = os.path.join(main_dir,'derivatives')
+    # if not os.path.exists(derivs):
+    #     os.mkdir(derivs)
 
     sub=0
     for subj in subj_dirs:
@@ -124,14 +125,14 @@ def re_format(maindir,metadata):
             sub+=1
             if sub<=9: sub_name = "sub-0{}".format(sub)
             else: sub_name = "sub-{}".format(sub)
-            print("\tOld ID: {} --> NewID: {}\n".format(subj, sub_name))
+            # print("\tOld ID: {} --> NewID: {}\n".format(subj, sub_name))
             metadf.loc[metadf.Subject.astype(int) == int(subj), 'Subject_Num'] = sub_name
 
-            if not os.path.exists(os.path.join(main_dir,sub_name)):
-                os.mkdir(os.path.join(main_dir,sub_name))
-                os.mkdir(os.path.join(main_dir,sub_name,'anat'))
-                os.mkdir(os.path.join(main_dir,sub_name,'dwi'))
-                os.mkdir(os.path.join(main_dir,sub_name,'func'))
+            # if not os.path.exists(os.path.join(main_dir,sub_name)):
+            #     os.mkdir(os.path.join(main_dir,sub_name))
+            #     os.mkdir(os.path.join(main_dir,sub_name,'anat'))
+            #     os.mkdir(os.path.join(main_dir,sub_name,'dwi'))
+            #     os.mkdir(os.path.join(main_dir,sub_name,'func'))
 
 
             # non_nii = {
@@ -175,8 +176,19 @@ def re_format(maindir,metadata):
             # print(sorteddates)
 
             runs = dict(enumerate(sorteddates))
-            print(runs)
 
+            im_ids={}
+            for k,v in runs.items():
+                im_ids[k+1]=[f[0].split('_I')[-1].split('.')[0] for r,d,f in os.walk(subject) if len(r.split('/'))==6 and r.split('/')[4].split('.')[0]==v]
+            # print(im_ids)
+
+            for k,v in im_ids.items():
+                print(k,v)
+                for id_str in v:
+                    if k<=9:
+                        metadf.loc[metadf['Image Data ID'].astype(str) == id_str, 'Run_Num'] = f'0{k}'
+                    else:
+                        metadf.loc[metadf['Image Data ID'].astype(str) == id_str, 'Run_Num'] = str(k)
             # For each modality,
             # Convert images to NIfTI and rearrange file structure
             if len(rawanats) > 0: bidsify(rawanats,runs,'T1w',           'anat','mprage',srcdata,derivs,sub_name,main_dir)
@@ -212,7 +224,8 @@ def re_format(maindir,metadata):
     #             if not os.listdir(root):
     #                 os.rmdir(root)
 
-    metadf.to_csv(os.path.join(main_dir,'participants.tsv'),sep='\t')
+    # metadf.to_csv(os.path.join(main_dir,'participants.tsv'),sep='\t')
+    metadf.to_csv(os.path.join('/Volumes/ElementsExternal','participants.tsv'),sep='\t')
     return
 
 if __name__=='__main__':

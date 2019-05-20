@@ -24,12 +24,24 @@ def gen_hshtbl(trk):
     return hshtbl
 
 
-def gen_masks(fs_dir,subrun,vols):
-    parcseg = os.path.join(fs_dir,subrun,'mri','aparc+aseg.mgz')
+def gen_masks(fs_dir,subrun,vols,subject,maindir):
+    diff = 100
+    anatr=''
+    for anatf in os.listdir(os.path.join(maindir,subject,'anat','freesurfer')):
+        if os.path.isdir(os.path.join(maindir,subject,'anat','freesurfer',anatf)):
+            d = abs(int(subrun.split('_')[1].split('-')[1])-int(anatf.split('_')[1].split('-')[1]))
+            if d<diff:
+                diff=d
+                anatr = anatf
+            if d==diff:
+                if int(anatf.split('_')[1].split('-')[1])<int(anatr.split('_')[1].split('-')[1]):
+                    anatr = anatf
+    anatr='_'.join(anatr.split('_')[:2])
+    parcseg = os.path.join(fs_dir,anatr,'mri','aparc+aseg.mgz')
     anat = nib.load(parcseg)
     anat_img = anat.get_fdata().astype(int)
     anat_aff = anat.affine
-    mask_dir = os.path.join(fs_dir,subrun,'seg_masks')
+    mask_dir = os.path.join(fs_dir,anatr,'seg_masks')
     bash_command(f'mkdir {mask_dir}')
     labels=np.unique(anat_img)
     try:
@@ -39,8 +51,8 @@ def gen_masks(fs_dir,subrun,vols):
     for label in v_ids:
         mask = np.ma.array(anat_img, mask = anat_img != label, fill_value=0).filled()
         np.savez(os.path.join(mask_dir,f'{int(label)}_msk'), mask)
-        msk_nii = nib.Nifti1Image(mask,anat_aff)
-        nib.save(msk_nii,os.path.join(mask_dir,f'{int(label)}_msk.nii'))
+        # msk_nii = nib.Nifti1Image(mask,anat_aff)
+        # nib.save(msk_nii,os.path.join(mask_dir,f'{int(label)}_msk.nii'))
     return mask_dir,parcseg
 
 def read_trkfile(run):
@@ -59,9 +71,9 @@ def get_trks(subject, maindir,dtk_path,vol_ids):
         fsdir = os.path.join(sub,'anat','freesurfer')
         for run in os.listdir(trkdir):
             trkrun = os.path.join(trkdir,run)
-            if os.path.isdir(trkrun) and run in os.listdir(fsdir):
+            if os.path.isdir(trkrun): # and run in os.listdir(fsdir):
                 print(run)
-                maskdir,mgz = gen_masks(fsdir,run,vol_ids)
+                maskdir,mgz = gen_masks(fsdir,run,vol_ids,subject,maindir)
                 nii = mgz.split('.')[0]+'.nii'
                 bash_command(f'mri_convert --in_type mgz --out_type nii {mgz} {nii}')
                 bash_command(f'flirt -in {os.path.join(sub,"dwi","dtk",run)}_dwi.nii -ref {nii} -omat {os.path.join(sub,"dwi",run)}_reg.mtx -out {os.path.join(sub,"dwi",run)}_reg')
@@ -74,8 +86,9 @@ def get_trks(subject, maindir,dtk_path,vol_ids):
                         np.savetxt(f'{os.path.join(trkrun,algo.split(".")[0])}_sl.txt',np.array(hshtbl))
                         vxl_sl={}
                         for maskf in os.listdir(maskdir):
-                            if maskf.endswith('npy'):
-                                mask = np.load(os.path.join(maskdir,maskf))
+                            if maskf.endswith('npz'):
+                                mask = np.load(os.path.join(maskdir,maskf))['arr_0']
+
                                 vxl_sl[maskf.split("_")[0]]=gen_hshtbl(list(utils.target(algo_trks,mask,algo_aff)))
 
                         sl_vxl={}
@@ -92,7 +105,7 @@ def get_trks(subject, maindir,dtk_path,vol_ids):
 if __name__=="__main__":
 
     #main_dir = '/Volumes/ElementsExternal/mridti_test2/'
-    main_dir = '/Volumes/ElementsExternal/mridti_test2'
+    main_dir = '/Volumes/ElementsExternal/feat_test'
     # dtk_home = '/data/brain/dtk/'
     dtk_home='/Applications/Diffusion_Toolkit.app/Contents/MacOS/'
     vols=os.path.join(main_dir,'vols.txt')
@@ -110,7 +123,7 @@ if __name__=="__main__":
         lt.write(f'<=============| BCG features Run |=============>\n\nDate: {datetime.datetime.now()}\nFolder: {main_dir}\nn_jobs: {n_jobs}')
 
     main_start=time.time()
-    Parallel(n_jobs=-2,verbose=50)(delayed(get_trks)(subdir, main_dir, dtk_home, vols) for subdir in os.listdir(main_dir) if os.path.isdir(os.path.join(main_dir,subdir)))
+    Parallel(n_jobs=1,verbose=50)(delayed(get_trks)(subdir, main_dir, dtk_home, vols) for subdir in os.listdir(main_dir) if os.path.isdir(os.path.join(main_dir,subdir)))
     main_dur = time.time() - main_start
 
     with open('times.txt','a') as tt:

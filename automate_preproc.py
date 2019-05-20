@@ -170,7 +170,7 @@ def run_eddy(hdr_info, subject, topup_ran, proc='_openmp'):
     else: topup_flag = ''
     for run in list(hdr_info.keys()):
         """ run eddy on each run, if not already done """
-        if not f'{run}_eddy_corr' in ''.join(os.listdir(os.path.join(subject,'dwi'))):
+        if not f'{run}_eddy_corr.nii' in ''.join(os.listdir(os.path.join(subject,'dwi'))):
             print("\t\tRun {}".format(run))
             if not topup_ran:
                 mask_prefix = run
@@ -223,10 +223,8 @@ def run_brainsuite(subject, hdr_info, bs_home, topup_ran):
                 .format(bs_home, subject, '_'.join(run.split('_')[:2]),\
                                  subject, '_'.join(run.split('_')[:2])))
         if not os.path.exists(os.path.join(\
-                    subject,'anat','brainsuite','_'.join(run.split('_')[:2]))) \
-                    or not os.path.exists(os.path.join(\
                     subject,'anat','brainsuite','_'.join(run.split('_')[:2]),\
-                    f"{'_'.join(run.split('_')[:2])}_T1w_brain.dwi.RAS.correct.mADC.T1_coord.nii.gz")):
+                    f"{'_'.join(run.split('_')[:2])}_T1w_brain.dwi.RAS.correct.nii.gz")):
             print("\t\t\t... running brainsuite diffusion pipeline (BDP)")
             if not topup_ran: dwi_mask = '{}/dwi/{}_brain_mask'.format(subject,run)
             with open('{}/dwi/{}_run_bdp.sh'.format(subject,run),'w') as bdp_sh:

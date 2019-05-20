@@ -1,3 +1,5 @@
+import matplotlib
+matplotlib.use('Agg')
 import os
 import json
 import numpy as np
@@ -7,16 +9,24 @@ import seaborn as sns
 import scipy.sparse as ss
 
 def build_A(nodes,maindir):
-    all_nodes = dict.fromkeys(sorted(set([int(v) for vols in [list(nodes[sub][run].keys()) for sub in nodes.keys() for run in nodes[sub].keys()] for v in vols])))
+    all_nodes = dict.fromkeys(sorted(set([int(v) \
+        for vols in [list(nodes[sub][run].keys()) \
+        for sub in nodes.keys() for run in nodes[sub].keys()] \
+        for v in vols])))
     print(len(all_nodes.keys()))
     for vol in all_nodes.keys():
-        all_nodes[vol] = np.mean(np.array([float(c) for cntr in [(nodes[sub][run][str(vol)]).strip('[]').split() for sub in nodes.keys() for run in nodes[sub].keys() if str(vol) in nodes[sub][run].keys()] for c in cntr]).reshape((-1,3)), axis=0)
+        all_nodes[vol] = np.mean(np.array([float(c) \
+            for cntr in [(nodes[sub][run][str(vol)]).strip('[]').split() \
+            for sub in nodes.keys() for run in nodes[sub].keys() \
+            if str(vol) in nodes[sub][run].keys()] \
+            for c in cntr]).reshape((-1,3)), axis=0)
     cntrs=[]
     vols=[]
     for k,v in all_nodes.items():
         cntrs.append(v)
         vols.append(k)
     np.savetxt(os.path.join(maindir,'vols.txt'),vols)
+    np.savetxt(os.path.join(maindir,'centers.txt'),cntrs)
 
     dists = squareform(pdist(cntrs,metric='euclidean'))
 
@@ -33,7 +43,7 @@ def build_A(nodes,maindir):
             if A[r][c]>0 and A[r][c]!=A[c][r]:
                 A[c][r]=A[r][c]
 
-    A = A + np.eye(len(all_nodes))*np.mean(kdists,axis=1) # add self-connections
+    A = A + np.eye(len(all_nodes))*np.mean(kdists[idx],axis=1) # add self-connections
 
     for r in range(A.shape[0]):
         for c in range(A.shape[1]):
@@ -45,8 +55,8 @@ def build_A(nodes,maindir):
 
 if __name__ == "__main__":
 
-    #main_dir='/Volumes/ElementsExternal/mridti_test2'
-    main_dir = '/data/brain/mridti_small'
+    main_dir='/Volumes/ElementsExternal/feat_test'
+    # main_dir = '/data/brain/mridti_small'
 
     with open(os.path.join(main_dir,'center_vxls.json'),'r') as n:
         nodes_dict = json.load(n)

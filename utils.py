@@ -3,6 +3,7 @@ import json
 import numpy as np
 import scipy.sparse as sp
 import torch
+import pandas as pd
 
 # def load_data(path="../data/cora/", dataset="cora"):
 #     """Load citation network dataset (cora only for now)"""
@@ -115,8 +116,10 @@ def load_data(maindir):
 
     # build graph
     adj = np.load(os.path.join(maindir,'adj_mtrx.npy'))
-    
+
     ftrs_dict={}
+    labels=[]
+    participants=pd.read_csv('/Volumes/ElementsExternal/participants.tsv',delimiter='\t')
     for subdir in os.listdir(maindir):
         if 'sub-' in subdir:
             for run in os.listdir(os.path.join(maindir,subdir,'dwi','tracks')):
@@ -129,7 +132,7 @@ def load_data(maindir):
                         #for algo in j.keys():
                             #print('\t',algo,' ',algo,' ',len(j[algo].keys()))
                     if os.path.exists(os.path.join(imdir,'feature_mts.npy')):
-                        features = np.load(os.path.join(imdir,'feature_mts.npy')) 
+                        features = np.load(os.path.join(imdir,'feature_mts.npy'))
                     else:
                         features = gen_feats(imdir)
                     if len(features):
@@ -137,7 +140,15 @@ def load_data(maindir):
                         features = [normalize(ftrs) for ftrs in features]
                         features = [torch.FloatTensor(np.array(ftrs.todense())) for ftrs in features]
                         ftrs_dict[run] = features
-
+                        labels.append(\
+                            participants.loc[participants['Subject_Num']==\
+                            subdir.split('-')[1] and \
+                            participants['Run_Num']==\
+                            run.split('_')[1].split('-')[1], 'Group'].iloc[0])
+                        labels.append(\
+                            participants.query(\
+                            'Subject_Num == @subdir & Run_Num == @run.split("_")[1].split("-")[1]'\
+                            ).Group.values[0])
     adj = sp.coo_matrix(adj)
     adj = normalize(adj)
     adj = sparse_mx_to_torch_sparse_tensor(adj)
@@ -147,7 +158,8 @@ def load_data(maindir):
     # # idx_test = range(500, 1500)
     #
     # features = torch.cat([ftrs.view(ftrs.size()[0],ftrs.size()[1],1) for ftrs in features],-1)
-    labels=np.genfromtxt(os.path.join(maindir,'labels.txt'),dtype=np.dtype(str))
+    # labels=np.genfromtxt(os.path.join(maindir,'labels.txt'),dtype=np.dtype(str))
+
     #with open(os.path.join(maindir,'labels.txt'),'r') as l:
     #    for line in l.readlines():
     #        labels[line.split('  ')[0]] = line.split('  ')[1].strip().strip('[]')
@@ -163,9 +175,9 @@ def load_data(maindir):
                 #print(i[0].decode("utf-8"))
                 #print(i)
                 lbls.append([int(i[1]),int(i[2])])
-    
+
     #print(lbls)
-    #lbls = encode_onehot(lbls)
+    lbls = encode_onehot(labels)
     #print(np.where(lbls)[1])
     lbls = torch.LongTensor(np.where(lbls)[1])
     # print(features)
