@@ -101,8 +101,6 @@ def create_acq(hdr_stats, subj):
         if not acq_str: print("error reading PhaseEncodingDirection of {}"\
                                     .format(k))
         acq_str+=' '+str(v['readout'])+'\n'
-    # print('printf \"{}\" > {}acq.txt'.format(acq_str, subj+'/dwi/'))
-    # bash_cmd('printf "{}" > {}/dwi/acq.txt'.format(acq_str, subj)) #create acquisit. file
     with open(subj+'/dwi/acq.txt', 'w') as acq_txt:
         acq_txt.write(acq_str)
     print(hdr_stats)
@@ -170,17 +168,15 @@ def run_eddy(hdr_info, subject, topup_ran, proc='_openmp'):
     else: topup_flag = ''
     for run in list(hdr_info.keys()):
         """ run eddy on each run, if not already done """
-        if not f'{run}_eddy_corr.nii' in ''.join(os.listdir(os.path.join(subject,'dwi'))):
+        if not f'{run}_eddy_corr.nii' in ''.join(os.listdir(
+                                        os.path.join(subject,'dwi'))):
             print("\t\tRun {}".format(run))
             if not topup_ran:
                 mask_prefix = run
             ind +=1
-            # bash_cmd('indx = ""')
             indx = ''
-            # bash_cmd('for ((i=1;i<=65;i+=1));do indx="$indx {}"; done'.format(ind))
             vols = nib.load(os.path.join(subject,'dwi',run+'.nii')).shape[3]
             indx = ' '.join(list([str(ind) for _ in range(1,vols+1)]))
-            # bash_cmd('echo $indx > index.txt')
             with open (subject+'/dwi/index{}.txt'.format(ind), 'w') as index_txt:
                 index_txt.write(indx)
                 index_txt.write(' ')
@@ -200,61 +196,66 @@ def run_brainsuite(subject, hdr_info, bs_home, topup_ran):
     for run in list(hdr_info.keys()):
         print("\tPerforming dwi-mri co-registration for run {}"\
             .format(run))
-        if not f"{'_'.join(run.split('_')[:2])}_T1w_bdp_brain.nii" in ''.join(os.listdir(os.path.join(subject,'anat','brainsuite'))):
+        if not f"{'_'.join(run.split('_')[:2])}_T1w_bdp_brain.nii" in ''.join(
+                        os.listdir(os.path.join(subject,'anat','brainsuite'))):
             print("\t\t\t... skull strip re: anatomical image")
             diff = 100
             anatr=''
             for anatf in os.listdir(os.path.join(subject,'anat')):
                 if anatf.endswith('nii'):
-                    d = abs(int(run.split('_')[1].split('-')[1])-int(anatf.split('_')[1].split('-')[1]))
+                    d = abs(int(run.split('_')[1].split('-')[1]) -
+                                        int(anatf.split('_')[1].split('-')[1]))
                     if d<diff:
                         diff=d
                         anatr = anatf
                     if d==diff:
-                        if int(anatf.split('_')[1].split('-')[1])<int(anatr.split('_')[1].split('-')[1]):
+                        if int(anatf.split('_')[1].split('-')[1]) <
+                                        int(anatr.split('_')[1].split('-')[1]):
                             anatr = anatf
             bash_cmd('{}/bin/bse -i {}/anat/{} -o {}/anat/brainsuite/{}_T1w_bdp_brain --mask {}/anat/brainsuite/{}_T1w_bdp_brain_mask'\
                 .format(bs_home, subject,anatr,\
                         subject,'_'.join(run.split('_')[:2]),\
                         subject,'_'.join(run.split('_')[:2])))
-        if not f"{'_'.join(run.split('_')[:2])}_T1w_brain.bfc" in ''.join(os.listdir(os.path.join(subject,'anat','brainsuite'))):
+        if not f"{'_'.join(run.split('_')[:2])}_T1w_brain.bfc" in ''.join(
+                        os.listdir(os.path.join(subject,'anat','brainsuite'))):
             print("\t\t\t... Bias Field Correction on anatomical image")
             bash_cmd('{}/bin/bfc -i {}/anat/brainsuite/{}_T1w_bdp_brain -o {}/anat/brainsuite/{}_T1w_brain.bfc'\
                 .format(bs_home, subject, '_'.join(run.split('_')[:2]),\
                                  subject, '_'.join(run.split('_')[:2])))
         if not os.path.exists(os.path.join(\
                     subject,'anat','brainsuite','_'.join(run.split('_')[:2]),\
-                    f"{'_'.join(run.split('_')[:2])}_T1w_brain.dwi.RAS.correct.nii.gz")):
+                    f"{'_'.join(run.split('_')[:2])}_T1w_brain.dwi.RAS.correct.mADC.T1_coord.nii.gz")):
             print("\t\t\t... running brainsuite diffusion pipeline (BDP)")
-            if not topup_ran: dwi_mask = '{}/dwi/{}_brain_mask'.format(subject,run)
+            if not topup_ran: dwi_mask = '{}/dwi/{}_brain_mask'.format(subject,
+                                                                            run)
             with open('{}/dwi/{}_run_bdp.sh'.format(subject,run),'w') as bdp_sh:
                 bdp_sh.write('{}/bdp/bdp.sh {}/anat/brainsuite/{}_T1w_brain.bfc.nii.gz --output-diffusion-coordinate --output-subdir {} --dir=\"{}\" --t1-mask {}/anat/brainsuite/{}_T1w_bdp_brain_mask.nii.gz --dwi-mask {}.nii.gz --nii {}/dwi/{}_eddy_corr.nii.gz -g {}/dwi/{}_eddy_corr.eddy_rotated_bvecs -b {}/dwi/{}.bval'\
                     .format(bs_home, subject,'_'.join(run.split('_')[:2]), \
-                               '_'.join(run.split('_')[:2]), hdr_info[run]['bdp'], \
-                               subject,'_'.join(run.split('_')[:2]), dwi_mask, subject,run, subject,run, subject,run))
+                               '_'.join(run.split('_')[:2]), hdr_info[run]['bdp'],
+                               subject,'_'.join(run.split('_')[:2]), dwi_mask,
+                               subject,run, subject,run, subject,run))
 
             bash_cmd('sh {}/dwi/{}_run_bdp.sh'.format(subject,run))
     return
 
-def run_freesurfer(main_dir, subject, sub_dir, proc=''):
+def run_freesurfer(main_dir, subject, sub_dir, anatfile,proc=''):
     print(" Anatomy (MRI)")
     print("+=============+")
     print("\tPerforming Freesurfer for each run")
     anatdir = os.path.join(subject,'anat')
     if not os.path.exists(os.path.join(anatdir,'freesurfer')):
         bash_cmd(f'mkdir {os.path.join(anatdir,"freesurfer")}')
-
-    for anatfile in os.listdir(anatdir):
-        if anatfile.endswith('.nii'):
-            if not os.path.exists(os.path.join(anatdir,'freesurfer',f"{anatfile.split('_T1w')[0]}",'mri','aparc+aseg.nii')):
-                print("\t\trun {}".format(anatfile))
-                bash_cmd('recon-all {} -sd {} -s {} -i {} -all'\
-                .format(proc, anatdir+'/freesurfer', sub_dir+'_'+anatfile.split('_')[1], \
-                anatdir+'/'+anatfile))
+    if not os.path.exists(os.path.join(anatdir,'freesurfer',
+                            anatfile.split('_T1w')[0],'mri','aparc+aseg.nii')):
+        print("\t\trun {}".format(anatfile))
+        bash_cmd(f'recon-all -sd {os.path.join(anatdir,"freesurfer")} -s {anatfile.split("_T1w")[0]} -i {os.path.join(anatdir,anatfile)} -all')
     print("\n")
     return
 
 def fmriprep(main_dir, subject, sub_dir):
+    """
+        Still under development
+    """
     print(" Functional MRI Pocessing")
     print("+=========================+")
     print("\tUsing C-PAC for each run")
@@ -265,7 +266,6 @@ def fmriprep(main_dir, subject, sub_dir):
     #         print("\t\trun {funcfile}")
 
     bash_cmd(f"sudo docker run -i --rm --n_cpus {ncpus} -v {main_dir}:/bids_dataset -v {main_dir}/func_output:/outputs -v /tmp:/scratch fcpindi/c-pac:latest /bids_dataset /outputs participant")
-    # bash_cmd(f"sudo docker run -i --rm --n_cpus {ncpus} -v {main_dir}/func_outputs:/bids_dataset -v {main_dir}/group_outputs:/outputs -v /tmp:/scratch fcpindi/c-pac:latest /bids_dataset /outputs group")
 
     return
 
@@ -282,22 +282,26 @@ def preprocess_subject(subject, maindir, brainsuitedir, gpu=False, init_setup=Fa
         topup_stats,topup_runs,use_topup = pick_dwi_runs(sub)
 
         if use_topup:
-            if not os.path.exists(os.path.join(sub,'dwi','b0merge.nii.gz')) and not os.path.exists(os.path.join(sub,'dwi','b0merge.nii')):
+            if not os.path.exists(os.path.join(sub,'dwi','b0merge.nii.gz')) and
+                    not os.path.exists(os.path.join(sub,'dwi','b0merge.nii')):
                 merge_b0s(sub,topup_runs,use_topup)
             if not 'topup' in ''.join(os.listdir(os.path.join(sub,'dwi'))):
                 stats_topup = run_topup(topup_stats, maindir, sub)
             else: stats_topup = create_acq(topup_stats,sub)
-            if not 'topup_b0_brain' in ''.join(os.listdir(os.path.join(sub,'dwi'))):
+            if not 'topup_b0_brain' in ''.join(os.listdir(os.path.join(sub,
+                                                                    'dwi'))):
                 skull_strip_dwi(sub, sub.split('/')[-1]+'_topup_b0')
         else:
-            if not os.path.exists(os.path.join(sub,'dwi','b0merge.nii.gz')) and not os.path.exists(os.path.join(sub,'dwi','b0merge.nii')):
+            if not os.path.exists(os.path.join(sub,'dwi','b0merge.nii.gz')) and
+                    not os.path.exists(os.path.join(sub,'dwi','b0merge.nii')):
                 merge_b0s(sub,list(topup_stats.keys()),use_topup)
             stats_topup = create_acq(topup_stats, sub)
             for run in list(stats_topup.keys()):
-                if not f'{run}_brain' in ''.join(os.listdir(os.path.join(sub,'dwi'))):
+                if not f'{run}_brain' in ''.join(os.listdir(os.path.join(sub,
+                                                                    'dwi'))):
                     skull_strip_dwi(sub, run)
 
-        # skull_strip(sub, list(topup_stats.keys()), use_topup)
+        skull_strip(sub, list(topup_stats.keys()), use_topup)
 
         if gpu: eddyproc = '_cuda'
         else: eddyproc = '_openmp'
@@ -309,7 +313,9 @@ def preprocess_subject(subject, maindir, brainsuitedir, gpu=False, init_setup=Fa
         if gpu: fsproc = '-use-cuda'
         else: fsproc = '' #'-openmp 4'
 
-        run_freesurfer(maindir,sub,subject, fsproc)
+        Parallel(n_jobs=5,verbose=50)(delayed(run_freesurfer)(maindir,sub,
+            subject, anatf, fsproc) for anatf in
+            os.listdir(os.path.join(sub,'anat')) if anatf.endswith('nii'))
 
         # fmriprep(maindir,sub,subject)
 
@@ -324,9 +330,9 @@ def preprocess_subject(subject, maindir, brainsuitedir, gpu=False, init_setup=Fa
 
 if __name__ == "__main__":
 
-    main_dir = '/Volumes/ElementsExternal/mridti_test2/' #f'/home/xtian/preproc{sys.argv[1]}/'
-    brainsuite_home = '/Applications/BrainSuite18a' #'/usr/local/BrainSuite19a'
-    n_jobs = 1 #23
+    main_dir = f'/home/xtian/preproc{sys.argv[1]}/'
+    brainsuite_home = '/home/xtian/BrainSuite19a'
+    n_jobs = 20
 
     with open('times.txt','a') as tt:
         tt.write(f'\n<=============| Preprocessing Run |============>\n\nDate: {datetime.datetime.now()}\nFolder: {main_dir}\nn_jobs: {n_jobs}')
@@ -335,7 +341,12 @@ if __name__ == "__main__":
         lt.write(f'<=============| Preprocessing Run |=============>\n\nDate: {datetime.datetime.now()}\nFolder: {main_dir}\nn_jobs: {n_jobs}')
 
     main_start=time.time()
-    Parallel(n_jobs=n_jobs,verbose=50)(delayed(preprocess_subject)(subdir, main_dir, brainsuite_home) for subdir in os.listdir(main_dir) if os.path.isdir(main_dir+subdir))
+
+    Parallel(n_jobs=-2,verbose=50)(delayed(run_freesurfer)(main_dir,
+            os.path.join(main_dir,subject), subject, anatf,'') for subject in
+            os.listdir(main_dir) if 'sub-' in subject for anatf in
+            os.listdir(os.path.join(main_dir,subject,'anat')) if
+            anatf.endswith('nii'))
     main_dur = time.time() - main_start
 
     with open('times.txt','a') as tt:
