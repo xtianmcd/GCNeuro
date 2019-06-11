@@ -89,8 +89,6 @@ class GraphAttentionLayer(nn.Module):
         if self.concat:
             return F.elu(h_prime)
         else:
-            #with open('att3ntions.txt','a') as att:
-            #    att.write(str(attention.detach()))
             np.save(f'att3ntions{n}.npy',np.array(attention.detach()))
             return h_prime
 
@@ -137,37 +135,20 @@ class GCNetwork(nn.Module):
         self.subgc = GCN(nfeat,int(nhid**2),int((nhid**2)/2),dropout)
 
         # self.p_gcn = GCN(int((nhid**2)/2),nhid,nclass,dropout)
-
         self.gat = GAT(int((nhid**2)/2), nhid, nclass, dropout, nheads, alpha)
-        #self.gat = GAT(nfeat, nhid, nclass, dropout, nheads, alpha)
-        
+    
     def forward(self, f, adj, n):
-        #for _ in range(20):
         f1 = torch.relu(self.subgc(f[0], adj))
         f2 = torch.relu(self.subgc(f[1], adj))
         f3 = torch.relu(self.subgc(f[2], adj))
         f4 = torch.relu(self.subgc(f[3], adj))
-        #print(list(f1.size()), f2.size(), f3.size(), f4.size())
         xf = torch.cat([f1.view(f1.size()[0],f1.size()[1],1),
                         f2.view(f1.size()[0],f1.size()[1],1),
                         f3.view(f1.size()[0],f1.size()[1],1),
                         f4.view(f1.size()[0],f1.size()[1],1)],-1)
-        #print(xf.size())
         mp = nn.MaxPool1d((4))
         xp = mp(xf).view(f1.size())
-        #print(xp.size())
-        ## xo = F.log_softmax(self.p_gcn(xp,adj),dim=1)
         xo = self.gat(xp,adj.to_dense(),n)
-        #print(xo.size())
         o = torch.mean(xo, dim=0)
 
-        #f1 = torch.mean(self.gat(f[0], adj.to_dense()), dim=0)
-        #f2 = torch.mean(self.gat(f[1], adj.to_dense()), dim=0)
-        #f3 = torch.mean(self.gat(f[2], adj.to_dense()), dim=0)
-        #f4 = torch.mean(self.gat(f[3], adj.to_dense()), dim=0)
-        #print(f1.size())
-        #o=torch.stack([f1,f2,f3,f4])
-        #print(o.size())
-        #o=torch.mean(o, dim=0)
-        #print(o.size())
         return o

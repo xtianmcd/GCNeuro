@@ -2,7 +2,7 @@
 
 echo "Install dependencies"
 sudo apt-get update
-sudo apt-get --assume-yes install bzip2 git libxml2-dev unzip emacs tmux tcsh
+sudo apt-get --assume-yes install bzip2 git libxml2-dev unzip emacs tmux tcsh bc docker.io
 
 echo "Anaconda"
 wget https://repo.anaconda.com/archive/Anaconda3-2019.03-Linux-x86_64.sh
@@ -24,6 +24,12 @@ tar -zxvf freesurfer-Linux-centos6_x86_64-stable-pub-v6.0.0.tar.gz
 echo 'export FREESURFER_HOME=/home/xtian/freesurfer' >>~/.bashrc
 echo 'source $FREESURFER_HOME/SetUpFreeSurfer.sh' >>~/.bashrc
 rm freesurfer-Linux-centos6_x86_64-stable-pub-v6.0.0.tar.gz
+gsutil cp "gs://$BUCKET_DIR/license.txt" ./freesurfer
+echo 'export FSFAST_HOME=/home/xtian/freesurfer/fsfast' >>~/.bashrc
+echo 'export MNI_DIR=/home/xtian/freesurfer/mni' >>~/.bashrc
+echo 'export MINC_BIN_DIR=/home/xtian/freesurfer/mni/bin' >>~/.bashrc
+echo 'export MINC_LIB_DIR=/home/xtian/freesurfer/mni/lib' >>~/.bashrc
+echo 'export PERL5LIB=/home/xtian/freesurfer/mni/share/perl5' >>~/.bashrc
 
 echo "FSL"
 wget https://fsl.fmrib.ox.ac.uk/fsldownloads/fslinstaller.py
@@ -32,6 +38,8 @@ echo 'FSLDIR=/home/xtian/fsl' >>~/.bashrc
 echo 'PATH=${FSLDIR}/bin:${PATH}' >>~/.bashrc
 echo 'export FSLDIR PATH' >>~/.bashrc
 echo '. ${FSLDIR}/etc/fslconf/fsl.sh' >>~/.bashrc
+echo 'export FSL_DIR=/home/xtian/fsl' >>~/.bashrc
+source ~/.bashrc
 
 echo "MATLAB"
 wget http://ssd.mathworks.com/supportfiles/downloads/R2015b/deployment_files/R2015b/installers/glnxa64/MCR_R2015b_glnxa64_installer.zip
@@ -52,7 +60,6 @@ rm Diffusion_Toolkit_v0.6.4.1_x86_64.tar
 echo "Preproc Files"
 gsutil cp "gs://$BUCKET_DIR/automate_preproc.py" .
 gsutil cp "gs://$BUCKET_DIR/dtk.py" .
-
 
 source ~/.bashrc
 

@@ -42,16 +42,6 @@ def re_run(files):
                     newf[4]=nf4_new
                     print(newf)
                     os.mkdir('/'.join(newf[:5]))
-                    # if not os.path.exists('/'.join(newf[:5])): os.mkdir('/'.join(newf[:5]))
-                    # else:
-                    #     print('path exists, else loop called')
-                    #     while os.path.exists('/'.join(newf[:5])):
-                    #         nf4_s = int(newf[4].split('_')[-1].split('.')[0])+1
-                    #         if nf4_s>59: nf4_s=nf4_s-59-1
-                    #         if nf4_s<=9: nf4_new = '_'.join(newf[4].split('_')[:-1])+'_0'+str(nf4_s)+'.0'
-                    #         else: nf4_new = '_'.join(newf[4].split('_')[:-1])+'_'+str(nf4_s)+'.0'
-                    #         newf[4]=nf4_new
-                    #     os.mkdir('/'.join(newf[:5]))
                     newf='/'.join(newf)
                     os.rename(files[ff],os.path.join(newf))
                     files[ff]=newf
@@ -97,24 +87,24 @@ def re_format(maindir,metadata):
     subj_dirs = os.listdir(main_dir)
     metadata=os.path.join(main_dir,metadata)
 
-    # jsondict = {
-    #     "Name":maindir,
-    #     "BIDSVersion": "1.0.0rc1"
-    # }
-    #
+    jsondict = {
+        "Name":maindir,
+        "BIDSVersion": "1.0.0rc1"
+    }
+    
     metadf = pd.read_csv(metadata)
     metadf["Subject_Num"]=""
     metadf["Run_Num"]=""
-    #
-    # with open(os.path.join(main_dir,'dataset_description.json'), 'w') as outfile:
-    #     json.dump(jsondict, outfile)
 
-    # srcdata = os.path.join(main_dir,'sourcedata/')
-    # if not os.path.exists(srcdata):
-    #     os.mkdir(srcdata)
-    # derivs = os.path.join(main_dir,'derivatives')
-    # if not os.path.exists(derivs):
-    #     os.mkdir(derivs)
+    with open(os.path.join(main_dir,'dataset_description.json'), 'w') as outfile:
+        json.dump(jsondict, outfile)
+
+    srcdata = os.path.join(main_dir,'sourcedata/')
+    if not os.path.exists(srcdata):
+        os.mkdir(srcdata)
+    derivs = os.path.join(main_dir,'derivatives')
+    if not os.path.exists(derivs):
+        os.mkdir(derivs)
 
     sub=0
     for subj in subj_dirs:
@@ -128,34 +118,20 @@ def re_format(maindir,metadata):
             # print("\tOld ID: {} --> NewID: {}\n".format(subj, sub_name))
             metadf.loc[metadf.Subject.astype(int) == int(subj), 'Subject_Num'] = sub_name
 
-            # if not os.path.exists(os.path.join(main_dir,sub_name)):
-            #     os.mkdir(os.path.join(main_dir,sub_name))
-            #     os.mkdir(os.path.join(main_dir,sub_name,'anat'))
-            #     os.mkdir(os.path.join(main_dir,sub_name,'dwi'))
-            #     os.mkdir(os.path.join(main_dir,sub_name,'func'))
+            if not os.path.exists(os.path.join(main_dir,sub_name)):
+                os.mkdir(os.path.join(main_dir,sub_name))
+                os.mkdir(os.path.join(main_dir,sub_name,'anat'))
+                os.mkdir(os.path.join(main_dir,sub_name,'dwi'))
+                os.mkdir(os.path.join(main_dir,sub_name,'func'))
 
-
-            # non_nii = {
-            #     "anat": list([os.path.join(roota,filenamea) for roota,dirnamesa,filenamesa in os.walk(subject) if len(roota.split('/'))==6 and 'T1' in roota.split('/')[3] for filenamea in filenamesa if not filenamea.endswith('.nii')]),
-            #     "fa"  : list(os.path.join(rootf,filenamef) for rootf,dirnamesf,filenamesf in os.walk(subject) if len(rootf.split('/'))==6 and 'FA' in rootf.split('/')[3] for filenamef in filenamesf if not filenamef.endswith('.nii'))
-            # }
-            # if non_nii["anat"]: print("WARNING: some T1 file(s) not .nii format in {} - {}".format(subj, non_nii['anat']))
-            # if non_nii["fa"]: print("WARNING: some FA file(s) not .nii format in {} - {}".format(subj, non_nii['fa']))
 
             # Compile lists of all filepaths to images of a given modality
-            # anats = list([os.path.join(roota,filenamea) \
-            #           for roota,dirnamesa,filenamesa in os.walk(subject) \
-            #           if len(roota.split('/'))==6 and 'T1' in \
-            #           roota.split('/')[3] for filenamea in filenamesa \
-            #           if filenamea.endswith('.nii')])
             rawanats = re_run(list(roota for roota,dirnamesa,filenamesa in \
                         os.walk(subject) if len(roota.split('/'))==6 and 'MPRAGE' in \
                         roota.split('/')[3].upper()))
             rawdiffs = re_run(list(rootr for rootr,dirnamesr,filenamesr in \
                         os.walk(subject) if len(rootr.split('/'))==6 and 'DTI'    in \
                         rootr.split('/')[3].upper()))
-            # fadiffs = list(os.path.join(rootf,filenamef) for rootf,dirnamesf,filenamesf in os.walk(subject) if len(rootf.split('/'))==6 and 'FA' in rootf.split('/')[3] for filenamef in filenamesf if filenamef.endswith('.nii'))
-            # diffs = list([os.path.join(roota,filenamea) for roota,dirnamesa,filenamesa in os.walk(subject) if len(roota.split('/'))==6 and 'DWI' in roota.split('/')[3] for filenamea in filenamesa if filenamea.endswith('.nii')])
             rawfuncs = re_run(list(rootf for rootf,dirnamesf,filenamesf in \
                         os.walk(subject) if len(rootf.split('/'))==6 and 'EP2D'   in \
                         rootf.split('/')[3].upper()))
@@ -173,14 +149,12 @@ def re_format(maindir,metadata):
             dates = [datetime.datetime.strptime(ts, "%Y-%m-%d_%H_%M_%S") for ts in dates]
             dates.sort()
             sorteddates = [datetime.datetime.strftime(ts, "%Y-%m-%d_%H_%M_%S") for ts in dates]
-            # print(sorteddates)
-
+            
             runs = dict(enumerate(sorteddates))
 
             im_ids={}
             for k,v in runs.items():
                 im_ids[k+1]=[f[0].split('_I')[-1].split('.')[0] for r,d,f in os.walk(subject) if len(r.split('/'))==6 and r.split('/')[4].split('.')[0]==v]
-            # print(im_ids)
 
             for k,v in im_ids.items():
                 print(k,v)
@@ -204,16 +178,6 @@ def re_format(maindir,metadata):
                         with open(os.path.join(funcdir,jsn),'w') as jw:
                             json.dump(jdict,jw)
 
-            # run=0
-            # for fadiff in fadiffs:
-            #     run+=1
-            #     if not os.path.exists(derivs+sub_name):
-            #         os.mkdir(derivs+sub_name)
-            #         os.mkdir(derivs+sub_name+'/fa/')
-            #     newfn = sub_name+'_run-0{}_dwi.nii'.format(run)
-            #     faroot = '/'.join(fadiff.split('/')[:-1])
-            #     os.rename(fadiff, os.path.join(faroot,newfn))
-            #     os.rename(os.path.join(faroot, newfn), os.path.join(derivs,sub_name,'fa',newfn))
 
     # print("... removing unneeded files ... \n")
     # while len(os.listdir(maindir)) > sub+4:
@@ -224,7 +188,6 @@ def re_format(maindir,metadata):
     #             if not os.listdir(root):
     #                 os.rmdir(root)
 
-    # metadf.to_csv(os.path.join(main_dir,'participants.tsv'),sep='\t')
     metadf.to_csv(os.path.join('/Volumes/ElementsExternal','participants.tsv'),sep='\t')
     return
 
