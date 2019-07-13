@@ -58,8 +58,8 @@ def move_files(destdir,maindir):
 
 if __name__=='__main__':
 
-    destination = './'+sys.argv[1]+'/' # path to destination folder
+    destination = f'{sys.argv[2]}/' # path to destination folder
 
-    main_dir = "./Downloads/"
+    main_dir = f'./{sys.argv[1]}/' # path to download folder
 
     move_files(destination,main_dir)
