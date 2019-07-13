@@ -52,3 +52,9 @@ The order of files to run is as follows:
 7. `dtk.py <main_dir> <dtk_dir>`
 8. `retrieve_outputs.py <main_dir>`
 9. `train.py <main_dir>`
+
+## Community Guidelines:
+
+Those wishing to add to or modify the pipeline are welcome to do so by submitting a Pull Request. 
+Any bugs or issues found in the code can by addressed by submitting an Issue. 
+For further assistance, please either submit an Issue or contact the authors at clm121@uga.edu or spq@uga.edu. 
