@@ -330,7 +330,7 @@ def preprocess_subject(subject, maindir, brainsuitedir, gpu=False, init_setup=Fa
 
 if __name__ == "__main__":
 
-    main_dir = f'/home/xtian/preproc{sys.argv[1]}/'
+    main_dir = f'{sys.argv[1]}/'
     brainsuite_home = '/home/xtian/BrainSuite19a'
     n_jobs = 20
 
