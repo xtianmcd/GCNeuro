@@ -6,7 +6,7 @@ This work contains the code involved in an end-to-end neuroimage analysis pipeli
 
 In this format, the nodes of the graph are defined by anatomical regions of interest (ROIs) and the diffusion data is depicted as signals, or vectors, defined on these nodes. 
 
-![](adj_mtx.png)
+![](adj_mtx_fig.png)
 ![](feats_fig.png)
 
 The graphs are processed using a novel graph convolutional network (GCN) architecture.
