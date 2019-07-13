@@ -12,11 +12,6 @@ import scipy.sparse as ss
 def build_A(nodes,maindir,kNN):
     all_nodes = dict.fromkeys(sorted(set([int(v) for vols in [list(nodes[sub][run].keys()) for sub in nodes.keys() for run in nodes[sub].keys()] for v in vols])))
     #print(sorted(set([int(v) for vols in [list(nodes[sub][run].keys()) for sub in nodes.keys() for run in nodes[sub].keys()] for v in vols])))
-    #for sub in nodes.keys():
-    #    print(sub)
-    #    for run in nodes[sub].keys():
-    #        print('\t',run)
-    #        print('\t',list(nodes[sub][run].keys()))
     print(len(all_nodes.keys()))
     for vol in all_nodes.keys():
         all_nodes[vol] = np.mean(np.array([float(c) for cntr in [(nodes[sub][run][str(vol)]).strip('[]').split() for sub in nodes.keys() for run in nodes[sub].keys() if str(vol) in nodes[sub][run].keys()] for c in cntr]).reshape((-1,3)), axis=0)
@@ -33,16 +28,11 @@ def build_A(nodes,maindir,kNN):
     
     
     dists = squareform(pdist(cntrs,metric='euclidean'))
-    # dists = dists + np.eye(len(all_nodes))*np.mean(dists,axis=1)
 
-    # kdists =  dists / np.amax(dists, axis=1)[:,np.newaxis]
     kdists = np.divide(dists,np.amax(dists))
     # print(kdists.shape)
     # print(kdists)
     idx = np.argsort(dists)[:,1:kNN]
-
-    # kdists = np.array([[dists[n][i] for i in idx[n]] for n in range(idx.shape[0])])
-    # # wt_kdists = kdists / np.amax(kdists,axis=1)[:,np.newaxis]
 
     A = np.zeros(dists.shape)
     for n in range(idx.shape[0]):
@@ -66,10 +56,7 @@ def build_A(nodes,maindir,kNN):
 
 if __name__ == "__main__":
 
-    #main_dir='/Volumes/ElementsExternal/mridti_test2'
-    #main_dir = '/data/brain/mridti_small'
-    #main_dir = '/data/brain/preproc_outputs'
-    main_dir = '/data/brain/preproc2_features'
+    main_dir = sys.argv[1]
     
     with open(os.path.join(main_dir,'center_vxls.json'),'r') as n:
         nodes_dict = json.load(n)
