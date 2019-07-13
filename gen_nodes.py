@@ -70,7 +70,7 @@ def get_rois(sub, maindir):
 
 if __name__=="__main__":
 
-    main_dir='/Volumes/ElementsExternal/mridti_test2'
+    main_dir=sys.argv[1]
     n_jobs=-2
     subj_centers={}
 
