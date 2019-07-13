@@ -5,6 +5,7 @@ from NN import *
 from GCN import *
 from utils import *
 import math
+import sys
 
 def train(epoch, adj, all_feats, labels, model, optimizer,n):
     t = time.time()
@@ -86,7 +87,7 @@ if __name__=='__main__':
     # args.cuda = not args.no_cuda and torch.cuda.is_available()
     use_cuda = not no_cuda and torch.cuda.is_available()
 
-    main_dir = '' #Add main directory here
+    main_dir = sys.argv[1]
 
     adj, pt_features, pt_labels, skl_features, skl_labels, pt_te_features,
             pt_te_labels, skl_te_features, skl_te_labels  = load_data(main_dir)
