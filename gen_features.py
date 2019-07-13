@@ -125,21 +125,10 @@ def get_trks(subject, maindir,dtk_path,vol_ids):
 
 
 if __name__=="__main__":
-
-    #main_dir = '/Volumes/ElementsExternal/mridti_test2/'
-    #main_dir = '/Volumes/ElementsExternal/feat_test'
-    #main_dir = '/home/xtian/preproc2_outputs'
-    main_dir = '/data/brain/preproc_outputs'
-    dtk_home = '/data/brain/dtk/'
-    #dtk_home='/Applications/Diffusion_Toolkit.app/Contents/MacOS/'
-    #dtk_home = '/usr/local/dtk/'
+    main_dir = sys.argv[1]
+    dtk_home = sys.argv[2]
     vols=os.path.join(main_dir,'vols.txt')
     n_jobs = -2
-
-    # for subdir in os.listdir(main_dir):
-    #     if os.path.isdir(main_dir+subdir):
-    #         # tracks[f'{subdir}'] = get_trks(subdir,main_dir)
-    #         get_trks(subdir,main_dir,dtk_home)
 
     with open('times.txt','a') as tt:
         tt.write(f'\n<=============| BCG features Run |============>\n\nDate: {datetime.datetime.now()}\nFolder: {main_dir}\nn_jobs: {n_jobs}')
