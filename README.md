@@ -1,7 +1,11 @@
 # GCNeuro
+### Developing a Graph Convolution-Based Analysis Pipeline for Multi-Modal Neuroimage Data: An Application to Parkinson’s Disease
+#### Christian McDaniel and Shannon Quinn
 
-This work contains the code involved in an end-to-end neuroimage analysis pipeline. The pipeline preprocesses anatomical (T1w) MRI and diffusion MRI and combines them in a single format as signals on a graph structure. 
+This work contains the code involved in an end-to-end neuroimage analysis pipeline. The pipeline preprocesses anatomical (T1w) MRI and diffusion MRI and combines them in a single graph-based format. In this format, the nodes of the graph are defined by anatomical regions of interest (ROIs) and the diffusion data is depicted as signals, or vectors, defined on these nodes. 
 
-The data in this format are processed using a novel graph convolutional network (GCN) architecture.
+The graphs are processed using a novel graph convolutional network (GCN) architecture.
 
-The paper which explains the pipeline in detail is under review for publication in the 2019 SciPy Proceedings.
+The paper, titled *Developing a Graph Convolution-Based Analysis Pipeline for Multi-Modal Neuroimage Data: An Application to Parkinson’s Disease* and which explains the pipeline in detail, has been published in the 2019 SciPy Proceedings.
+
+
