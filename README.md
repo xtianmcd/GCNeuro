@@ -28,7 +28,11 @@ The pipeline assumes data has been downloaded from the [PPMI](https://www.ppmi-i
 
 If your file structure differs from this, you may need to make some changes in the `neuro_format.py` and `make_bids.py` files. 
 
-Next, we have listed the order of the main scripts to be run. Many of these scripts take a long time to run and represent disctinct stages of the pipeline; each is a potential source for modification throughout the pipeline. As such, we have kept them separate as opposed to uniting them in a single executible file. Each file can by run from the terminal with the command `python <name_of_file.py> <arg_1> ... <arg_n>`. Depending on your setup, `python3` may need to be used instead of `python`.
+Next, we have listed the order of the main scripts to be run. Many of these scripts take a long time to run and represent disctinct stages of the pipeline; each is a potential source for modification throughout the pipeline. As such, we have kept them separate as opposed to uniting them in a single executible file. Each file can by run from the terminal with the command 
+
+`python <name_of_file.py> <arg_1> ... <arg_n>`. 
+
+Depending on your setup, `python3` may need to be used instead of `python`.
 
 The order of files to run is as follows: 
 
