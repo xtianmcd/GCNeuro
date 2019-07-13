@@ -132,15 +132,11 @@ def run_tractography(subject, maindir, dtkdir, init_setup=False):
 
 if __name__ == "__main__":
 
-    main_dir='/data/brain/AnatDiffFunc_27/'
-    #dtk_home='/Applications/Diffusion_Toolkit.app/Contents/MacOS/'
-    dtk_home = '/usr/local/dtk/'
+    main_dir=sys.argv[1]
+    dtk_home = sys.argv[2]
     n_jobs = -2
 
     create_gm(main_dir)
-
-    # for subdir in os.listdir(main_dir):
-    #     run_tractography(subdir, main_dir, dtk_home)
 
     with open('times.txt','a') as tt:
         tt.write(f'\n<=============| DTK Run |============>\n\nDate: {datetime.datetime.now()}\nFolder: {main_dir}\nn_jobs: {n_jobs}')
