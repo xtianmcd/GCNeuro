@@ -6,7 +6,7 @@ This work contains the code involved in an end-to-end neuroimage analysis pipeli
 
 The graphs are processed using a novel graph convolutional network (GCN) architecture.
 
-The paper, titled *Developing a Graph Convolution-Based Analysis Pipeline for Multi-Modal Neuroimage Data: An Application to Parkinson’s Disease* and which explains the pipeline in detail, has been published in the 2019 SciPy Proceedings.
+The [paper](http://conference.scipy.org/proceedings/scipy2019/pdfs/christian_mcdaniel.pdf), titled *Developing a Graph Convolution-Based Analysis Pipeline for Multi-Modal Neuroimage Data: An Application to Parkinson’s Disease* and which explains the pipeline in detail, has been published in the [2019 SciPy Proceedings](http://conference.scipy.org/proceedings/scipy2019/).
 
 ## Dependencies
 
@@ -26,7 +26,7 @@ The pipeline assumes data has been downloaded from the [PPMI](https://www.ppmi-i
 
 ![](PPMI_data_strxr.png)
 
-If your file structure differs from this, you may need to make some changes in the `neuro_format.py` and `make_bids.py` files. 
+If your file structure differs from this, you may need to make some changes in the `neuro_format.py` and `make_bids.py` files. We have included an outline of our download parameters in this repo as  
 
 Next, we have listed the order of the main scripts to be run. Many of these scripts take a long time to run and represent disctinct stages of the pipeline; each is a potential source for modification throughout the pipeline. As such, we have kept them separate as opposed to uniting them in a single executible file. Each file can by run from the terminal with the command 
 
