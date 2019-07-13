@@ -22,7 +22,7 @@ Softwares:
 
 ## How to Run the Pipeline
 
-The pipeline assumes data has been downloaded from the [PPMI](https://www.ppmi-info.org) database using the "Multi-Zip Download" feature. Below is a depiction of the PPMI file structure: 
+The pipeline assumes data has been downloaded from the [PPMI](https://www.ppmi-info.org) database using the "Multi-Zip Download" feature, and that the zip files are all stored in a single directory. Below is a depiction of the PPMI file structure: 
 
 ![](PPMI_data_strxr.png)
 
