@@ -6,12 +6,12 @@ This work contains the code involved in an end-to-end neuroimage analysis pipeli
 
 In this format, the nodes of the graph are defined by anatomical regions of interest (ROIs) and the diffusion data is depicted as signals, or vectors, defined on these nodes. 
 
-![](adj_mtx.py)
-![](feats_fig.py)
+![](adj_mtx.png)
+![](feats_fig.png)
 
 The graphs are processed using a novel graph convolutional network (GCN) architecture.
 
-![](GCNetwork_fig.py)
+![](GCNetwork_fig.png)
 
 The [paper](http://conference.scipy.org/proceedings/scipy2019/pdfs/christian_mcdaniel.pdf), titled *Developing a Graph Convolution-Based Analysis Pipeline for Multi-Modal Neuroimage Data: An Application to Parkinson’s Disease* and which explains the pipeline in detail, has been published in the [2019 SciPy Proceedings](http://conference.scipy.org/proceedings/scipy2019/).
 
