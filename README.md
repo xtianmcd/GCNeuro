@@ -27,3 +27,17 @@ The pipeline assumes data has been downloaded from the [PPMI](https://www.ppmi-i
 ![](PPMI_data_strxr.png)
 
 If your file structure differs from this, you may need to make some changes in the `neuro_format.py` and `make_bids.py` files. 
+
+Next, we have listed the order of the main scripts to be run. Many of these scripts take a long time to run and represent disctinct stages of the pipeline; each is a potential source for modification throughout the pipeline. As such, we have kept them separate as opposed to uniting them in a single executible file. Each file can by run from the terminal with the command `python <name_of_file.py> <arg_1> ... <arg_n>`. Depending on your setup, `python3` may need to be used instead of `python`.
+
+The order of files to run is as follows: 
+
+1. `neuro_format.py <download_dir> <destination_dir>`
+2. `make_bids.py <main_dir>`
+3. `automate_preproc.py <main_dir>`
+4. `gen_nodes.py <main_dir>`
+5. `adj_mtx.py <main_dir>`
+6. `gen_features.py <main_dir> <dtk_dir>`
+7. `dtk.py <main_dir> <dtk_dir>`
+8. `retrieve_outputs.py <main_dir>`
+9. `train.py <main_dir>`
