@@ -20,3 +20,10 @@ Python libraries:
 Softwares:
   python 3.5 or greater | [Freesurfer](http://www.freesurfer.net) | [FSL](https://fsl.fmrib.ox.ac.uk/fsl/fslwiki) | [MATLAB Compiler Runtime](https://www.mathworks.com/products/compiler/matlab-runtime.html) | [BrainSuite](http://brainsuite.org) | [Diffusion Toolkit](http://trackvis.org/dtk/) 
 
+## How to Run the Pipeline
+
+The pipeline assumes data has been downloaded from the [PPMI](https://www.ppmi-info.org) database using the "Multi-Zip Download" feature. Below is a depiction of the PPMI file structure: 
+
+![](PPMI_data_strxr.png)
+
+If your file structure differs from this, you may need to make some changes in the `neuro_format.py` and `make_bids.py` files. 
