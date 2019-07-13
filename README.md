@@ -8,4 +8,44 @@ The graphs are processed using a novel graph convolutional network (GCN) archite
 
 The paper, titled *Developing a Graph Convolution-Based Analysis Pipeline for Multi-Modal Neuroimage Data: An Application to Parkinson’s Disease* and which explains the pipeline in detail, has been published in the 2019 SciPy Proceedings.
 
+## Dependencies
 
+Non-python libraries: 
+  bzip2
+  git
+  libxml2-dev
+  unzip
+  tcsh
+  bc
+  docker.io
+
+Python libraries: 
+  time
+  math
+  argparse
+  os
+  sys
+  shutil
+  subprocess
+  json
+  builtins
+  pickle
+  datetime
+  numpy
+  scipy
+  pandas
+  sklearn
+  matplotlib
+  seaborn
+  joblib
+  nibabel
+  dipy
+  torch
+
+Softwares:
+  python 3.5 or greater
+  Freesurfer
+  FSL
+  MATLAB
+  BrainSuite
+  DTK
